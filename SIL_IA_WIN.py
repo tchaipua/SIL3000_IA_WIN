@@ -1437,14 +1437,17 @@ class PosicaoContasReceberWindow(BaseWindow):
 
     def carregar_anos(self):
         try:
-            import pyodbc
+            import pyodbc, pandas as pd
             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
-            conn = pyodbc.connect(conn_str); cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT YEAR(CRMovDta) FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999 ORDER BY 1 DESC")
-            anos = [str(int(row[0])) for row in cursor.fetchall()]
-            self.combo_ano.configure(values=["Todos"] + anos)
+            conn = pyodbc.connect(conn_str)
+            df = pd.read_sql("SELECT DISTINCT YEAR(CRMovDta) as Ano FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999", conn)
             conn.close()
-        except: pass
+            anos = sorted(df['Ano'].dropna().unique().astype(int).tolist(), reverse=True)
+            print("Anos encontrados na crmov2:", anos)
+            self.combo_ano.configure(values=["Todos"] + [str(a) for a in anos])
+            self.combo_ano.set("Todos")
+        except Exception as e:
+            print("ERRO EM CARREGAR ANOS:", str(e))
 
     def carregar_dados(self):
         try:
