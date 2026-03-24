@@ -1355,8 +1355,13 @@ class BaseWindow(ctk.CTkToplevel):
         btn_sair = ctk.CTkButton(self.bottom_bar, text="Fechar", command=self.destroy, fg_color="#C62828", hover_color="#B12020", width=100)
         btn_sair.pack(side="left", padx=20, pady=5)
 
+        from tkinter import messagebox
+        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=lambda: [self.clipboard_clear(), self.clipboard_append(id_str), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
+        btn_copy_id.pack(side="right", padx=(5, 20))
+
         self.lbl_id = ctk.CTkLabel(self.bottom_bar, text=f"Tela: {id_str}", font=("Arial", 11, "bold"), text_color="gray")
-        self.lbl_id.pack(side="right", padx=20)
+        self.lbl_id.pack(side="right", padx=5)
+        ToolTip(btn_copy_id, "COPIAR NOME TELA")
 
 class ResumoClienteWindow(BaseWindow):
     def __init__(self, parent, config):
@@ -1396,13 +1401,29 @@ class PosicaoContasReceberWindow(BaseWindow):
         self.combo_mes.pack(side="left", padx=5)
         self.combo_mes.set("Todos")
 
-        btn_filtrar = ctk.CTkButton(self.filter_frame, text="🔍 Filtrar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=90)
-        btn_filtrar.pack(side="left", padx=20)
+        btn_filtrar = ctk.CTkButton(self.filter_frame, text="🔍 Filtrar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=80)
+        btn_filtrar.pack(side="left", padx=15)
+
+        ctk.CTkLabel(self.filter_frame, text="Visualização:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(25, 5))
+        self.seg_view = ctk.CTkSegmentedButton(self.filter_frame, values=["Tabela", "Gráfico"], command=self.alternar_visualizacao, width=140)
+        self.seg_view.pack(side="left", padx=5)
+        self.seg_view.set("Tabela")
 
         # Ajuste Colunas
         self.tree.configure(columns=("Tipo", "Descricao", "Qtd", "Valor", "Percent"))
         self.tree.heading("Tipo", text="Cód Tipo"); self.tree.heading("Descricao", text="Tipo de Venda"); self.tree.heading("Qtd", text="Volume Notas"); self.tree.heading("Valor", text="Total Faturado"); self.tree.heading("Percent", text="% Particip.")
         self.tree.column("Tipo", width=80, anchor="center"); self.tree.column("Descricao", width=250); self.tree.column("Qtd", width=120, anchor="center"); self.tree.column("Valor", width=150, anchor="e"); self.tree.column("Percent", width=100, anchor="center")
+
+        # Container para o Gráfico
+        self.chart_frame = ctk.CTkFrame(self.grid_frame, fg_color="#FFFFFF")
+
+    def alternar_visualizacao(self, valor):
+        if valor == "Tabela":
+            self.chart_frame.pack_forget()
+            self.tree.pack(fill="both", expand=True, side="left")
+        else:
+            self.tree.pack_forget()
+            self.chart_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Legenda
         self.legendas = {
@@ -1412,7 +1433,6 @@ class PosicaoContasReceberWindow(BaseWindow):
             10: "Brinde", 11: "Financeira", 12: "Defeito", 13: "Pix"
         }
 
-        # Carregar Anos (Depois do setup)
         self.after(200, self.carregar_anos)
 
     def carregar_anos(self):
@@ -1457,6 +1477,9 @@ class PosicaoContasReceberWindow(BaseWindow):
 
             for item in self.tree.get_children(): self.tree.delete(item)
 
+            # Limpar Gráfico anterior
+            for widget in self.chart_frame.winfo_children(): widget.destroy()
+
             if not rows: return
 
             total_geral = sum(float(row[2]) for row in rows if row[2])
@@ -1473,6 +1496,25 @@ class PosicaoContasReceberWindow(BaseWindow):
                 
                 tag = 'even' if idx % 2 == 0 else 'odd'
                 self.tree.insert("", "end", values=(str(int(sit_cod)), descricao, f"{qtd:,}".replace(",", "."), valor_f, percent_f), tags=(tag,))
+
+            # Renderizar Gráfico ( Se houver linhas )
+            try:
+                 import matplotlib.pyplot as plt
+                 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+                 labels = [self.legendas.get(row[0] if row[0] is not None else 0, "Desconhecido") for row in rows]
+                 valores = [float(row[2]) if row[2] else 0.0 for row in rows]
+
+                 fig, ax = plt.subplots(figsize=(6, 4))
+                 explode = [0.05 if i == 0 else 0 for i in range(len(rows))] # Destaca o maior faturador
+                 ax.pie(valores, labels=labels, autopct='%1.1f%%', startangle=90, colors=plt.cm.Set3.colors, explode=explode, shadow=True)
+                 ax.axis('equal') # Desenha como círculo
+
+                 canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+                 canvas.draw()
+                 canvas.get_tk_widget().pack(fill="both", expand=True)
+                 plt.close(fig) # Liberar memoria
+            except: pass
 
         except Exception as e:
             from tkinter import messagebox
