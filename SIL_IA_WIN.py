@@ -1039,7 +1039,7 @@ class MainHub(ctk.CTk):
         self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_pararam.pack(pady=8, padx=15)
 
-        self.btn_contas = ctk.CTkButton(self.col1_frame, text="💰 Contas a Receber", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_contas = ctk.CTkButton(self.col1_frame, text="💰 Resumo por Tipo Venda", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_contas.pack(pady=8, padx=15)
 
         # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
@@ -1314,54 +1314,7 @@ class AnaliseProdutoWindow(ctk.CTkToplevel):
             messagebox.showerror("Erro de Filtro", f"Não foi possível carregar os produtos:\n\n{str(e)}")
 
 
-if __name__ == '__main__':
-    import sys
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Módulo de Análise e Atualização")
-    parser.add_argument("--tela", type=str, choices=["ANALISE", "CEP"], help="Abre uma tela específica diretamente")
-    parser.add_argument("--servidor", type=str, help="Servidor SQL Server")
-    parser.add_argument("--banco", type=str, help="Nome do Banco de Dados")
-    parser.add_argument("--usuario", type=str, help="Usuário SQL Server")
-    parser.add_argument("--senha", type=str, help="Senha SQL Server")
-    
-    args = parser.parse_args()
-    
-    # Configuração Padrão
-    config = {
-        "nome_usuario": "Operador", 
-        "servidor": r"servidor\sqlexpress", 
-        "banco": "msinfor", 
-        "usuario_bd": "sa", 
-        "senha_bd": "Mabelu2011"
-    }
-    
-    # Sobrescreve com argumentos da linha de comando se houver
-    if args.servidor: config["servidor"] = args.servidor
-    if args.banco: config["banco"] = args.banco
-    if args.usuario: config["usuario_bd"] = args.usuario
-    if args.senha: config["senha_bd"] = args.senha
-
-    if args.tela:
-        # Se for para abrir uma tela direta, cria um root invisível
-        root = ctk.CTk()
-        root.withdraw()
-        
-        if args.tela.upper() == "ANALISE":
-            app_win = AnaliseVendasWindow(root, config)
-        elif args.tela.upper() == "CEP":
-            app_win = App(root, config)
-            
-        root.mainloop()
-    else:
-        # Modo Padrão (Sem tela informada, abre o Hub)
-        app = MainHub()
-        # Se você quiser que o MainHub também aceite os argumentos acima:
-        if args.servidor: app.config["servidor"] = args.servidor
-        if args.banco: app.config["banco"] = args.banco
-        if args.usuario: app.config["usuario_bd"] = args.usuario
-        if args.senha: app.config["senha_bd"] = args.senha
-        app.mainloop()
+# [Bloco __main__ movido para o final definitivo do arquivo]
 
 
 # =====================================================================
@@ -1423,9 +1376,135 @@ class ClientesPararamWindow(BaseWindow):
 
 class PosicaoContasReceberWindow(BaseWindow):
     def __init__(self, parent, config):
-        super().__init__(parent, "Posição Contas a Receber", "CR_POSICAO")
-        ctk.CTkLabel(self.top_frame, text="💰 Contas a Receber", font=("Arial", 16, "bold")).pack(pady=25)
-        self.tree.configure(columns=("Vencimento", "Cliente", "Documento", "Valor", "Status"))
-        self.tree.heading("Vencimento", text="Vencimento"); self.tree.heading("Cliente", text="Cliente"); self.tree.heading("Documento", text="Nº Doc"); self.tree.heading("Valor", text="Valor"); self.tree.heading("Status", text="Status")
-        self.tree.column("Vencimento", width=120); self.tree.column("Cliente", width=300)
+        super().__init__(parent, "Resumo por Tipo Venda", "POS_VENDAS")
+        self.config_db = config
+
+        ctk.CTkLabel(self.top_frame, text="💰 Resumo por Tipo Venda", font=("Arial", 16, "bold")).pack(pady=10)
+
+        # Barra de Filtros
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(pady=(0, 10))
+
+        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=90)
+        self.combo_ano.pack(side="left", padx=5)
+        self.combo_ano.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=110)
+        self.combo_mes.pack(side="left", padx=5)
+        self.combo_mes.set("Todos")
+
+        btn_filtrar = ctk.CTkButton(self.filter_frame, text="🔍 Filtrar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=90)
+        btn_filtrar.pack(side="left", padx=20)
+
+        # Ajuste Colunas
+        self.tree.configure(columns=("Tipo", "Descricao", "Qtd", "Valor", "Percent"))
+        self.tree.heading("Tipo", text="Cód Tipo"); self.tree.heading("Descricao", text="Tipo de Venda"); self.tree.heading("Qtd", text="Volume Notas"); self.tree.heading("Valor", text="Total Faturado"); self.tree.heading("Percent", text="% Particip.")
+        self.tree.column("Tipo", width=80, anchor="center"); self.tree.column("Descricao", width=250); self.tree.column("Qtd", width=120, anchor="center"); self.tree.column("Valor", width=150, anchor="e"); self.tree.column("Percent", width=100, anchor="center")
+
+        # Legenda
+        self.legendas = {
+            0: "Todos as Vendas", 1: "Vista", 2: "Crediário", 3: "Cheque Pré-Datado", 
+            4: "Condicional", 5: "Cartão de Crédito", 6: "Boleto Bancário", 
+            7: "Orçamento", 8: "Farmácia Popular", 9: "Troca/Devolução", 
+            10: "Brinde", 11: "Financeira", 12: "Defeito", 13: "Pix"
+        }
+
+        # Carregar Anos (Depois do setup)
+        self.after(200, self.carregar_anos)
+
+    def carregar_anos(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT YEAR(CRMovDta) FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999 ORDER BY 1 DESC")
+            anos = [str(int(row[0])) for row in cursor.fetchall()]
+            self.combo_ano.configure(values=["Todos"] + anos)
+            conn.close()
+        except: pass
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cursor = conn.cursor()
+
+            ano = self.combo_ano.get()
+            mes = self.combo_mes.get()
+
+            where_clauses = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999"]
+            if ano != "Todos": where_clauses.append(f"YEAR(CRMovDta) = {int(ano)}")
+            if mes != "Todos": 
+                try: mes_idx = self.meses_ext.index(mes); where_clauses.append(f"MONTH(CRMovDta) = {mes_idx}")
+                except: pass
+
+            where_str = " AND ".join(where_clauses)
+            query = f"""
+                SELECT 
+                    crmov2sit, 
+                    COUNT(*) as Qtd, 
+                    SUM(CRMov2VlrO) as Valor
+                FROM crmov2
+                WHERE {where_str}
+                GROUP BY crmov2sit
+                ORDER BY Valor DESC
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall(); conn.close()
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+
+            if not rows: return
+
+            total_geral = sum(float(row[2]) for row in rows if row[2])
+
+            for idx, row in enumerate(rows):
+                sit_cod = row[0] if row[0] is not None else 0
+                qtd = int(row[1])
+                valor = float(row[2]) if row[2] else 0.0
+                percent = (valor / total_geral * 100) if total_geral > 0 else 0
+                
+                descricao = self.legendas.get(sit_cod, "Desconhecido")
+                valor_f = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                percent_f = f"{percent:.1f} %"
+                
+                tag = 'even' if idx % 2 == 0 else 'odd'
+                self.tree.insert("", "end", values=(str(int(sit_cod)), descricao, f"{qtd:,}".replace(",", "."), valor_f, percent_f), tags=(tag,))
+
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", f"Erro ao processar dados:\n{e}")
+
+if __name__ == '__main__':
+    import sys, argparse
+    parser = argparse.ArgumentParser(description="Módulo de Análise e Atualização")
+    parser.add_argument("--tela", type=str, choices=["ANALISE", "CEP"], help="Abre uma tela específica diretamente")
+    parser.add_argument("--servidor", type=str, help="Servidor")
+    parser.add_argument("--banco", type=str, help="Banco")
+    parser.add_argument("--usuario", type=str, help="Usuário")
+    parser.add_argument("--senha", type=str, help="Senha")
+    
+    args = parser.parse_args()
+    config = {"nome_usuario": "Operador", "servidor": r"servidor\sqlexpress", "banco": "msinfor", "usuario_bd": "sa", "senha_bd": "Mabelu2011"}
+    
+    if args.servidor: config["servidor"] = args.servidor
+    if args.banco: config["banco"] = args.banco
+    if args.usuario: config["usuario_bd"] = args.usuario
+    if args.senha: config["senha_bd"] = args.senha
+
+    if args.tela:
+        root = ctk.CTk(); root.withdraw()
+        if args.tela.upper() == "ANALISE": app_win = AnaliseVendasWindow(root, config)
+        elif args.tela.upper() == "CEP": app_win = App(root, config)
+        root.mainloop()
+    else:
+        app = MainHub()
+        if args.servidor: app.config["servidor"] = args.servidor
+        if args.banco: app.config["banco"] = args.banco
+        if args.usuario: app.config["usuario_bd"] = args.usuario
+        if args.senha: app.config["senha_bd"] = args.senha
+        app.mainloop()
 
