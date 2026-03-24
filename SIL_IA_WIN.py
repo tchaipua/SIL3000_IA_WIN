@@ -1011,30 +1011,43 @@ class MainHub(ctk.CTk):
         # Frame para os módulos (Canto Superior Esquerdo)
         self.modules_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        self.modules_frame.grid_columnconfigure((0, 1), weight=1)
+        self.modules_frame.grid_rowconfigure(0, weight=1)
         
-        # Todos os botões do menu terão a mesma largura base (estendendo-se horizontalmente conforme a grade)
         btn_width = 300
         
-        # COLUNA 0 - Módulos Existentes
-        self.btn_cep = ctk.CTkButton(self.modules_frame, text="📍 Atualizador de CEP", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_cep, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_cep.grid(row=0, column=0, padx=(0, 20), sticky="ew")
+        # --- CONTAINER 1º COLUNA ---
+        self.col1_frame = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col1_frame.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
+        
+        ctk.CTkLabel(self.col1_frame, text="1º Coluna", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(25, 15))
+
+        # Botões Coluna 1
+        self.btn_cep = ctk.CTkButton(self.col1_frame, text="📍 Atualizador de CEP", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_cep, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_cep.pack(pady=12, padx=30)
         ToolTip(self.btn_cep, "Reparo automatizado de CEPs")
 
-        self.btn_analise = ctk.CTkButton(self.modules_frame, text="📊 Analise vendas por dia/horário", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_analise, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_analise.grid(row=1, column=0, pady=(15, 0), padx=(0, 20), sticky="ew")
+        self.btn_analise = ctk.CTkButton(self.col1_frame, text="📊 Analise vendas por dia/horário", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_analise, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_analise.pack(pady=12, padx=30)
 
-        self.btn_analise_prod = ctk.CTkButton(self.modules_frame, text="🛒 Analise vendas por produto", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_analise_produto, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_analise_prod.grid(row=2, column=0, pady=(15, 0), padx=(0, 20), sticky="ew")
+        self.btn_analise_prod = ctk.CTkButton(self.col1_frame, text="🛒 Analise vendas por produto", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_analise_produto, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_analise_prod.pack(pady=12, padx=30)
 
-        # COLUNA 1 - Novos Módulos
-        self.btn_resumo_cli = ctk.CTkButton(self.modules_frame, text="� Resumo por Cliente", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_resumo_cli.grid(row=0, column=1, sticky="ew")
+        # --- CONTAINER 2º COLUNA ---
+        self.col2_frame = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col2_frame.grid(row=0, column=1, sticky="nsew", padx=15, pady=15)
+        
+        ctk.CTkLabel(self.col2_frame, text="2º Coluna", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(25, 15))
 
-        self.btn_pararam = ctk.CTkButton(self.modules_frame, text="🛑 Clientes Pararam Comprar", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_pararam.grid(row=1, column=1, pady=(15, 0), sticky="ew")
+        # Botões Coluna 2
+        self.btn_resumo_cli = ctk.CTkButton(self.col2_frame, text="👤 Resumo por Cliente", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_resumo_cli.pack(pady=12, padx=30)
 
-        self.btn_contas = ctk.CTkButton(self.modules_frame, text="💰 Posição Contas Receber", width=btn_width, height=45, font=("Arial", 14, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_contas.grid(row=2, column=1, pady=(15, 0), sticky="ew")
+        self.btn_pararam = ctk.CTkButton(self.col2_frame, text="🛑 Clientes Pararam Comprar", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_pararam.pack(pady=12, padx=30)
+
+        self.btn_contas = ctk.CTkButton(self.col2_frame, text="💰 Posição Contas Receber", width=btn_width, height=48, font=("Arial", 14, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_contas.pack(pady=12, padx=30)
 
         # Rodapé
         self.footer_frame = ctk.CTkFrame(self, height=35, fg_color="#1E1E1E")
