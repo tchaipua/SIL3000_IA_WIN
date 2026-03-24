@@ -21006,3 +21006,25 @@ Esta documentação reúne definições físicas e lógicas de colunas.
 
 ---
 
+
+## 📌 CRMov2Sit - Legenda do Tipo de Movimento (Contas a Receber)
+
+Esta legenda é utilizada para identificar a forma de pagamento ou tipo de transação registrada na coluna crmov2sit na tabela crmov2.
+
+| Valor | Descrição |
+| :--- | :--- |
+| **0** | Todos as Vendas |
+| **1** | Vista |
+| **2** | Crediário |
+| **3** | Cheque Pré-Datado |
+| **4** | Condicional |
+| **5** | Cartão de Crédito |
+| **6** | Boleto Bancário |
+| **7** | Orçamento |
+| **8** | Farmácia Popular |
+| **9** | Troca/Devolução |
+| **10** | Brinde |
+| **11** | Financeira |
+| **12** | Defeito |
+| **13** | Pix |
+
