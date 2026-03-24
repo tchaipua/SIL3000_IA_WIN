@@ -21028,3 +21028,14 @@ Esta legenda é utilizada para identificar a forma de pagamento ou tipo de trans
 | **12** | Defeito |
 | **13** | Pix |
 
+
+## 📌 CRMov2Flag - Status do Movimento de Vendas (Cabeçalho)
+
+Responsável por identificar o status financeiro e fiscal do movimento vinculado à tabela crmov2.
+
+| Valor | Descrição |
+| :--- | :--- |
+| **'A'** | Possui valor **Em Aberto** para receber |
+| **'F'** | Movimento **Totalmente Pago** / Fechado |
+| **'C'** | Movimento **Cancelado** |
+
