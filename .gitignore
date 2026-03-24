@@ -1,7 +1,7 @@
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
 env/
 venv/
@@ -9,9 +9,6 @@ ENV/
 build/
 dist/
 *.spec
-*.log
-.vscode/
 .idea/
-colunas_*.txt
-*.txt
-*.png
+.vscode/
+*.log
