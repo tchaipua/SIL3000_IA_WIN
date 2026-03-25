@@ -92,8 +92,9 @@ class TabelaConfigWindow(ctk.CTkToplevel):
         self.btn_salvar.pack(side="right")
 
         # --- Corpo da Tela (Formulário) ---
-        self.lbl_title = ctk.CTkLabel(self, text="⚙️ Colunas da Tabela de Clientes", font=ctk.CTkFont(size=18, weight="bold"))
-        self.lbl_title.pack(pady=(20, 10))
+        self.lbl_title = ctk.CTkLabel(self, text="⚙️ MAPEAMENTO DA TABELA", font=ctk.CTkFont(size=18, weight="bold"), text_color="#1565C0", anchor="w")
+        self.lbl_title.pack(pady=(20, 10), padx=30, fill="x")
+
 
         self.e_tabela = self.criar_input("Nome da Tabela", config["tabela"])
         self.e_id = self.criar_input("Coluna do ID/Código", config["col_id"])
@@ -175,7 +176,8 @@ class ConfigWindow(ctk.CTkToplevel):
         self.btn_salvar.pack(side="right")
 
         # --- Corpo da Tela (Empacotado depois, para o topo) ---
-        ctk.CTkLabel(self, text="⚙️ Configurar Acesso", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(20, 10))
+        ctk.CTkLabel(self, text="⚙️ CONFIGURAR ACESSO", font=ctk.CTkFont(size=20, weight="bold"), text_color="#1565C0", anchor="w").pack(pady=(20, 10), padx=30, fill="x")
+
         self.e_nome = self.criar_input("Nome do Usuário", config["nome_usuario"])
         self.e_servidor = self.criar_input("Servidor / Host", config["servidor"])
         self.e_banco = self.criar_input("Banco de Dados", config["banco"])
@@ -229,28 +231,36 @@ class App(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
 
         # --- Top Frame (Menu Superior Expandido) Cor Chumbo ---
-        self.top_frame = ctk.CTkFrame(self, height=70, fg_color="#D1D5DB", corner_radius=0)
+        self.top_frame = ctk.CTkFrame(self, fg_color="#D1D5DB", corner_radius=0)
         self.top_frame.grid(row=0, column=0, padx=0, pady=0, sticky="ew")
         self.top_frame.grid_columnconfigure(6, weight=1) # Espaçador
 
-        # Componentes do Top Frame
+        # --- NOVO: Linha de Título Superior ---
+        self.title_bar = ctk.CTkFrame(self.top_frame, fg_color="transparent", height=35)
+        self.title_bar.grid(row=0, column=0, columnspan=7, sticky="ew", padx=20, pady=(5, 0))
+        
+        self.lbl_titulo = ctk.CTkLabel(self.title_bar, text="📍 ATUALIZAÇÃO DE CEP", font=("Arial", 16, "bold"), text_color="#1565C0")
+        self.lbl_titulo.pack(side="left")
+
+        # Componentes do Top Frame (Agora na Row 1)
         self.btn_config = ctk.CTkButton(self.top_frame, text="⚙️ Mapear", width=100, fg_color="#455A64", hover_color="#37474F", command=self.abrir_config)
-        self.btn_config.grid(row=0, column=0, padx=10, pady=15)
+        self.btn_config.grid(row=1, column=0, padx=10, pady=(5, 15))
 
         self.search_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Buscar cliente (Deixe vazio para TODOS)...", width=260)
-        self.search_entry.grid(row=0, column=1, padx=10, pady=15)
+        self.search_entry.grid(row=1, column=1, padx=10, pady=(5, 15))
 
         self.btn_listar = ctk.CTkButton(self.top_frame, text="🔍 Simular Atualização", fg_color="#1E88E5", hover_color="#1565C0", command=self.simular_click)
-        self.btn_listar.grid(row=0, column=2, padx=10, pady=15)
+        self.btn_listar.grid(row=1, column=2, padx=10, pady=(5, 15))
 
         self.btn_filtrar = ctk.CTkButton(self.top_frame, text="👁️ Mostrar: TODOS", width=130, fg_color="#7B1FA2", hover_color="#4A148C", command=self.alternar_filtro_click)
-        self.btn_filtrar.grid(row=0, column=3, padx=10, pady=15)
+        self.btn_filtrar.grid(row=1, column=3, padx=10, pady=(5, 15))
 
         self.btn_gravar = ctk.CTkButton(self.top_frame, text="💾 Gravar no BD", width=120, fg_color="#43A047", hover_color="#2E7D32", state="disabled", command=self.gravar_click)
-        self.btn_gravar.grid(row=0, column=4, padx=10, pady=15)
+        self.btn_gravar.grid(row=1, column=4, padx=10, pady=(5, 15))
         
         self.lbl_stats = ctk.CTkLabel(self.top_frame, text="Simulação pendente...", font=ctk.CTkFont(slant="italic"))
-        self.lbl_stats.grid(row=0, column=5, padx=10)
+        self.lbl_stats.grid(row=1, column=5, padx=10, pady=(5, 15))
+
 
         # Botão Fechar de topo removido para usar apenas o do rodapé
 
@@ -743,9 +753,18 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         # 3. Topo: Controles (Cabeçalho Chumbo Ocupando Extensão)
         self.top_frame = ctk.CTkFrame(self, fg_color="#D1D5DB", corner_radius=0)
         self.top_frame.pack(side="top", fill="x", padx=0, pady=0)      
-        # Sub-container interno para margens
-        self.top_grid_frame = ctk.CTkFrame(self.top_frame)
-        self.top_grid_frame.pack(side="top", fill="x", padx=10, pady=10)
+
+        # --- NOVO: Linha de Título Superior ---
+        self.title_bar = ctk.CTkFrame(self.top_frame, fg_color="transparent", height=35)
+        self.title_bar.pack(side="top", fill="x", padx=20, pady=(5, 0))
+        
+        self.lbl_titulo = ctk.CTkLabel(self.title_bar, text="📊 ANÁLISE DE VENDAS POR HORA", font=("Arial", 16, "bold"), text_color="#1565C0")
+        self.lbl_titulo.pack(side="left")
+
+        # Sub-container interno para margens (Transparente para manter o fundo chumbo)
+        self.top_grid_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.top_grid_frame.pack(side="top", fill="x", padx=10, pady=(5, 10))
+
         self.top_grid_frame.grid_columnconfigure((1, 3, 5), weight=1)
 
         # LINHA 0
@@ -1079,7 +1098,7 @@ class MainHub(ctk.CTk):
         self.btn_analise_prod = ctk.CTkButton(self.col1_frame, text="🛒 Vendas por Produto", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_analise_produto, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_analise_prod.pack(pady=8, padx=15)
 
-        self.btn_resumo_cli = ctk.CTkButton(self.col1_frame, text="👤 Resumo por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_resumo_cli = ctk.CTkButton(self.col1_frame, text="🛍️ Análise Compras por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_resumo_cli.pack(pady=8, padx=15)
 
         self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
@@ -1098,6 +1117,12 @@ class MainHub(ctk.CTk):
 
         self.btn_sugestao_compra = ctk.CTkButton(self.col2_frame, text="🛒 Sugestão de Compra", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_sugestao_compra, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_sugestao_compra.pack(pady=8, padx=15)
+
+        self.btn_parcelas = ctk.CTkButton(self.col2_frame, text="💳 Análise das Parcelas", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_analise_parcelas, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_parcelas.pack(pady=8, padx=15)
+
+        self.btn_cobranca = ctk.CTkButton(self.col2_frame, text="📞 Cobrança por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=lambda: None, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_cobranca.pack(pady=8, padx=15)
 
         # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
         for col_idx in range(2, 5):
@@ -1213,6 +1238,7 @@ class MainHub(ctk.CTk):
     def abrir_posicao_contas(self): self.abrir_modulo(PosicaoContasReceberWindow)
     def abrir_estoque_parado(self): self.abrir_modulo(EstoqueParadoWindow)
     def abrir_sugestao_compra(self): self.abrir_modulo(SugestaoCompraWindow)
+    def abrir_analise_parcelas(self): self.abrir_modulo(AnaliseParcelasWindow)
 
 def centralizar_tela(tela, w, h):
     x = (tela.winfo_screenwidth() // 2) - (w // 2)
@@ -1223,112 +1249,167 @@ def centralizar_tela(tela, w, h):
 # =====================================================================
 # TELA 4: ANÁLISE DE VENDAS POR PRODUTO (CFG_PRODS)
 # =====================================================================
-import tkinter.ttk as ttk
+# NOVAS TELAS: BASE E ESPECIALIZADAS
+# =====================================================================
 
-class AnaliseProdutoWindow(ctk.CTkFrame):
-    def __init__(self, parent, config):
+class BaseWindow(ctk.CTkFrame):
+    def __init__(self, parent, title_str, id_str):
         super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
-        self.config_db = config
+        self.grid_rowconfigure(1, weight=1); self.grid_columnconfigure(0, weight=1)
 
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        # 1. Top Filters
-        self.top_frame = ctk.CTkFrame(self, fg_color="#F5F5F7", height=80, corner_radius=0)
-        self.top_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
-        self.top_frame.grid_columnconfigure(6, weight=1)
-
-        ctk.CTkLabel(self.top_frame, text="Ano:", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=(20, 5), pady=20, sticky="e")
-        self.combo_ano = ctk.CTkComboBox(self.top_frame, values=["Todos"], width=100)
-        self.combo_ano.grid(row=0, column=1, padx=5, pady=20, sticky="w")
-
-        ctk.CTkLabel(self.top_frame, text="Mês:", font=("Arial", 12, "bold")).grid(row=0, column=2, padx=(20, 5), pady=20, sticky="e")
-        self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-        self.combo_mes = ctk.CTkComboBox(self.top_frame, values=self.meses_ext, width=120)
-        self.combo_mes.set("Todos")
-        self.combo_mes.grid(row=0, column=3, padx=5, pady=20, sticky="w")
-
-        ctk.CTkLabel(self.top_frame, text="Métrica:", font=("Arial", 12, "bold")).grid(row=0, column=4, padx=(20, 5), pady=20, sticky="e")
-        self.combo_metrica = ctk.CTkComboBox(self.top_frame, values=["Quantidade", "Valor Venda", "Lucro"], width=130)
-        self.combo_metrica.set("Quantidade")
-        self.combo_metrica.grid(row=0, column=5, padx=5, pady=20, sticky="w")
-
-        ctk.CTkLabel(self.top_frame, text="Exibir:", font=("Arial", 12, "bold")).grid(row=0, column=6, padx=(20, 5), pady=20, sticky="e")
-        self.combo_limite = ctk.CTkComboBox(self.top_frame, values=["Top 10", "Top 20", "Top 50", "Top 100"], width=110)
-        self.combo_limite.set("Top 20")
-        self.combo_limite.grid(row=0, column=7, padx=5, pady=20, sticky="w")
-
-        ctk.CTkLabel(self.top_frame, text="Produto:", font=("Arial", 12, "bold")).grid(row=1, column=0, padx=(20, 5), pady=(5, 20), sticky="e")
-        self.txt_pesquisa = ctk.CTkEntry(self.top_frame, placeholder_text="Filtrar por nome do produto...", width=360)
-        self.txt_pesquisa.grid(row=1, column=1, columnspan=4, padx=5, pady=(5, 20), sticky="w")
-
-        self.btn_filtrar = ctk.CTkButton(self.top_frame, text="🔍 Atualizar", font=("Arial", 12, "bold"), width=120, command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0")
-        self.btn_filtrar.grid(row=1, column=5, padx=20, pady=(5, 20), sticky="w")
-
-        # 2. Main Frame
-        self.grid_frame = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=0)
-        self.grid_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        # Top Bar (Cabeçalho Chumbo)
+        self.top_frame = ctk.CTkFrame(self, fg_color="#D1D5DB", corner_radius=0)
+        self.top_frame.grid(row=0, column=0, sticky="ew")
         
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("Treeview", background="#FFFFFF", fieldbackground="#FFFFFF", foreground="black", rowheight=32, font=("Arial", 11))
-        style.configure("Treeview.Heading", background="#1565C0", foreground="white", font=("Arial", 11, "bold"))
-        style.map("Treeview", background=[('selected', '#1E88E5')], foreground=[('selected', 'white')])
+        # --- NOVO: Linha de Título Superior ---
+        self.title_bar = ctk.CTkFrame(self.top_frame, fg_color="transparent", height=25)
+        self.title_bar.pack(side="top", fill="x", padx=20, pady=(0, 0))
 
-        self.tree = ttk.Treeview(self.grid_frame, columns=("Rank", "Cod", "Desc", "Qtd", "Venda", "Lucro"), show="headings", selectmode="browse")
+
+        
+        # Título da Tela à Esquerda (Azul)
+        self.lbl_titulo = ctk.CTkLabel(self.title_bar, text=title_str.upper(), font=("Arial", 16, "bold"), text_color="#1565C0")
+        self.lbl_titulo.pack(side="left", pady=0)
+
+
+
+        # Grid frame
+        self.grid_frame = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=0)
+        self.grid_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 10))
+
+
+        style = ttk.Style()
+        style.configure(id_str + ".Treeview", background="#FFFFFF", fieldbackground="#FFFFFF", foreground="black", rowheight=32, font=("Arial", 11))
+        style.configure(id_str + ".Treeview.Heading", background="#1565C0", foreground="white", font=("Arial", 11, "bold"))
+
+        self.tree = ttk.Treeview(self.grid_frame, show="headings", selectmode="browse")
         self.tree.pack(fill="both", expand=True, side="left")
         self.tree.tag_configure('even', background='#FFFFFF')
         self.tree.tag_configure('odd', background='#E2E8F0')
 
-        self.tree.heading("Rank", text="🏆 #")
-        self.tree.heading("Cod", text="🔑 Código")
-        self.tree.heading("Desc", text="📦 Produto")
-        self.tree.heading("Qtd", text="🛒 Qtd")
-        self.tree.heading("Venda", text="💰 Total Venda")
-        self.tree.heading("Lucro", text="📈 Lucro")
-
-        self.tree.column("Rank", width=40, anchor="center")
-        self.tree.column("Cod", width=80, anchor="center")
-        self.tree.column("Desc", width=300, anchor="w")
-        self.tree.column("Qtd", width=60, anchor="center")
-        self.tree.column("Venda", width=120, anchor="center")
-        self.tree.column("Lucro", width=120, anchor="center")
-
-        sb = ttk.Scrollbar(self.grid_frame, orient="vertical", command=self.tree.yview)
-        sb.pack(fill="y", side="right")
-        self.tree.configure(yscrollcommand=sb.set)
-
-        # 3. Footer
-        self.footer_frame = ctk.CTkFrame(self, height=50, fg_color="#F5F5F7", corner_radius=0)
-        self.footer_frame.grid(row=2, column=0, sticky="ew", padx=0, pady=0)
-
-        fechar_ico_path = os.path.join(os.path.dirname(__file__), "btn_fechar.png")
-        if os.path.exists(fechar_ico_path):
-            img_fechar = Image.open(fechar_ico_path).resize((18, 18))
-            self.fechar_img = ctk.CTkImage(light_image=img_fechar, dark_image=img_fechar, size=(18, 18))
-            self.btn_fechar = ctk.CTkButton(self.footer_frame, text="Fechar Tela", image=self.fechar_img, compound="left", font=("Arial", 12, "bold"), fg_color="transparent", text_color="black", border_width=2, border_color="black", hover_color="#E0E0E0", width=130, command=self.fechar_tela)
-        else:
-            self.btn_fechar = ctk.CTkButton(self.footer_frame, text="Fechar Tela", font=("Arial", 12, "bold"), fg_color="transparent", text_color="black", border_width=2, border_color="black", hover_color="#E0E0E0", width=130, command=self.fechar_tela)
-        self.btn_fechar.pack(side="left", padx=20, pady=10)
+        # Rodape (Transparente para consistência)
+        self.bottom_bar = ctk.CTkFrame(self, fg_color="transparent", height=40, corner_radius=0)
+        self.bottom_bar.grid(row=2, column=0, sticky="ew")
+        
+        btn_sair = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", command=self.fechar_tela, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 12, "bold"), border_width=2, border_color="black", width=130)
+        btn_sair.pack(side="left", padx=20, pady=5)
 
         # Botões de Exportação
-        self.btn_export_pdf = ctk.CTkButton(self.footer_frame, text="📄 Exportar PDF", width=120, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
+        self.btn_export_pdf = ctk.CTkButton(self.bottom_bar, text="📄 Exportar PDF", width=120, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
         self.btn_export_pdf.pack(side="right", padx=5)
         
-        self.btn_export_excel = ctk.CTkButton(self.footer_frame, text="📊 Exportar Excel", width=120, height=32, fg_color="#43A047", hover_color="#2E7D32", command=self.exportar_excel)
+        self.btn_export_excel = ctk.CTkButton(self.bottom_bar, text="📊 Exportar Excel", width=120, height=32, fg_color="#43A047", hover_color="#2E7D32", command=self.exportar_excel)
         self.btn_export_excel.pack(side="right", padx=5)
 
-        self.frame_id = ctk.CTkFrame(self.footer_frame, fg_color="transparent")
-        self.frame_id.pack(side="right", padx=15)
-        self.lbl_tela_id = ctk.CTkLabel(self.frame_id, text="Tela: CFG_PRODS", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
-        self.lbl_tela_id.pack(side="left")
         from tkinter import messagebox
-        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", command=lambda: [self.clipboard_clear(), self.clipboard_append("CFG_PRODS"), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
-        self.btn_copy_id.pack(side="left", padx=5)
-        ToolTip(self.btn_copy_id, "COPIAR NOME TELA")
-        
+        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=lambda: [self.clipboard_clear(), self.clipboard_append(id_str), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
+        btn_copy_id.pack(side="right", padx=(5, 20))
+
+        self.lbl_id = ctk.CTkLabel(self.bottom_bar, text=f"Tela: {id_str}", font=("Arial", 11, "bold"), text_color="gray")
+        self.lbl_id.pack(side="right", padx=5)
+        ToolTip(btn_copy_id, "COPIAR NOME TELA")
+
+    def fechar_tela(self):
+        self.pack_forget()
+        if hasattr(self, 'hub') and hasattr(self.hub, 'modules_frame'):
+            self.hub.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        self.destroy()
+
+    def exportar_excel(self):
+        items = self.tree.get_children()
+        from tkinter import messagebox
+        if not items: messagebox.showwarning("Aviso", "Nenhum dado para exportar."); return
+        try:
+             columns = self.tree["columns"]; cols_titles = [self.tree.heading(c)["text"] for c in columns]; data = [self.tree.item(k)['values'] for k in items]
+             import pandas as pd, tempfile, os
+             df = pd.DataFrame(data, columns=cols_titles)
+             filepath = os.path.join(tempfile.gettempdir(), "Relatorio_Dados.xlsx")
+             
+             writer = pd.ExcelWriter(filepath, engine='openpyxl')
+             df.to_excel(writer, index=False, sheet_name='Sheet1')
+             worksheet = writer.sheets['Sheet1']
+             for i, col in enumerate(df.columns):
+                  max_len = max(df[col].astype(str).map(len).max(), len(str(col))) + 2
+                  from openpyxl.utils import get_column_letter
+                  worksheet.column_dimensions[get_column_letter(i+1)].width = max_len
+             writer.close()
+             
+             os.startfile(filepath)
+        except Exception as e: messagebox.showerror("Erro Excel", str(e))
+
+    def exportar_pdf(self):
+        items = self.tree.get_children()
+        from tkinter import messagebox
+        if not items: messagebox.showwarning("Aviso", "Nenhum dado para exportar."); return
+        try:
+             columns = self.tree["columns"]; cols_titles = [self.tree.heading(c)["text"] for c in columns]; data = [self.tree.item(k)['values'] for k in items]
+             import tempfile, os
+             filepath = os.path.join(tempfile.gettempdir(), "Relatorio_Dados.pdf")
+             import sys, subprocess
+             try: import fpdf
+             except: subprocess.run([sys.executable, "-m", "pip", "install", "fpdf"], capture_output=True); import fpdf
+             pdf = fpdf.FPDF(); pdf.add_page(); pdf.set_font("Arial", 'B', 12); pdf.cell(190, 10, "RELATORIO DE DADOS", 0, 1, 'C'); pdf.ln(5)
+             pdf.set_font("Arial", 'B', 8); num_cols = len(cols_titles); w_col = 190 / num_cols if num_cols > 0 else 30
+             for c in cols_titles: 
+                  c_str = str(c).encode('latin-1', 'replace').decode('latin-1')
+                  pdf.cell(w_col, 8, c_str, 1, 0, 'C')
+             pdf.ln(8); pdf.set_font("Arial", '', 7)
+             for r in data:
+                  for val in r: 
+                       v_str = str(val)[:20].encode('latin-1', 'replace').decode('latin-1')
+                       pdf.cell(w_col, 7, v_str, 1, 0, 'C')
+                  pdf.ln(7)
+             if hasattr(self, 'lbl_rodape_total'):
+                  pdf.ln(5); pdf.set_font("Arial", 'B', 10)
+                  txt_rodape = self.lbl_rodape_total.cget("text").encode('latin-1', 'replace').decode('latin-1')
+                  pdf.cell(190, 10, txt_rodape, 0, 1, 'R')
+             pdf.ln(5); pdf.output(filepath); os.startfile(filepath)
+        except Exception as e: messagebox.showerror("Erro PDF", str(e))
+
+
+class AnaliseProdutoWindow(BaseWindow):
+    def __init__(self, parent, config):
+        super().__init__(parent, "Análise de Vendas por Produto", "CFG_PRODS")
+        self.config_db = config
+
+        # Barra de Filtros (Alinhada à esquerda e transparente)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
+
+
+        # LINHA 1
+        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=90, font=("Arial", 15))
+        self.combo_ano.pack(side="left", padx=5); self.combo_ano.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=120, font=("Arial", 15))
+        self.combo_mes.pack(side="left", padx=5); self.combo_mes.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Métrica:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.combo_metrica = ctk.CTkComboBox(self.filter_frame, values=["Quantidade", "Valor Venda", "Lucro"], width=130, font=("Arial", 15))
+        self.combo_metrica.pack(side="left", padx=5); self.combo_metrica.set("Quantidade")
+
+        ctk.CTkLabel(self.filter_frame, text="Exibir:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.combo_limite = ctk.CTkComboBox(self.filter_frame, values=["Top 10", "Top 20", "Top 50", "Top 100"], width=110, font=("Arial", 15))
+        self.combo_limite.pack(side="left", padx=5); self.combo_limite.set("Top 20")
+
+        ctk.CTkLabel(self.filter_frame, text="Produto:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(25, 5))
+        self.txt_pesquisa = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar por nome...", width=200, font=("Arial", 15))
+        self.txt_pesquisa.pack(side="left", padx=5)
+
+        btn_processar = ctk.CTkButton(self.filter_frame, text="🔍 Atualizar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
+        btn_processar.pack(side="left", padx=15)
+
+        # Ajuste Colunas
+        self.tree.configure(columns=("Rank", "Cod", "Desc", "Qtd", "Venda", "Lucro"))
+        self.tree.heading("Rank", text="🏆 #"); self.tree.heading("Cod", text="🔑 Código"); self.tree.heading("Desc", text="📦 Produto"); self.tree.heading("Qtd", text="🛒 Qtd"); self.tree.heading("Venda", text="💰 Total Venda"); self.tree.heading("Lucro", text="📈 Lucro")
+        self.tree.column("Rank", width=50, anchor="center"); self.tree.column("Cod", width=90, anchor="center"); self.tree.column("Desc", width=350); self.tree.column("Qtd", width=90, anchor="center"); self.tree.column("Venda", width=160, anchor="e"); self.tree.column("Lucro", width=150, anchor="e")
+
         # Bootstrap
         self.after(200, self.carregar_anos)
+
 
     def carregar_anos(self):
         server = self.config_db.get("servidor")
@@ -1495,139 +1576,36 @@ class AnaliseProdutoWindow(ctk.CTkFrame):
 # [Bloco __main__ movido para o final definitivo do arquivo]
 
 
-# =====================================================================
-# NOVAS TELAS: RESUMO, INATIVOS, CONTAS RECEBER
-# =====================================================================
 
-class BaseWindow(ctk.CTkFrame):
-    def __init__(self, parent, title_str, id_str):
-        super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
-        self.grid_rowconfigure(1, weight=1); self.grid_columnconfigure(0, weight=1)
-
-        # Top Bar
-        self.top_frame = ctk.CTkFrame(self, fg_color="#F5F5F7", height=80, corner_radius=0)
-        self.top_frame.grid(row=0, column=0, sticky="ew")
-
-        # Grid frame
-        self.grid_frame = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=0)
-        self.grid_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
-
-        style = ttk.Style()
-        style.configure(id_str + ".Treeview", background="#FFFFFF", fieldbackground="#FFFFFF", foreground="black", rowheight=32, font=("Arial", 11))
-        style.configure(id_str + ".Treeview.Heading", background="#1565C0", foreground="white", font=("Arial", 11, "bold"))
-
-        self.tree = ttk.Treeview(self.grid_frame, show="headings", selectmode="browse")
-        self.tree.pack(fill="both", expand=True, side="left")
-        self.tree.tag_configure('even', background='#FFFFFF')
-        self.tree.tag_configure('odd', background='#E2E8F0')
-
-        # Rodape
-        self.bottom_bar = ctk.CTkFrame(self, fg_color="#F5F5F7", height=40, corner_radius=0)
-        self.bottom_bar.grid(row=2, column=0, sticky="ew")
-        
-        btn_sair = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", command=self.fechar_tela, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 12, "bold"), border_width=2, border_color="black", width=130)
-        btn_sair.pack(side="left", padx=20, pady=5)
-
-        # Botões de Exportação
-        self.btn_export_pdf = ctk.CTkButton(self.bottom_bar, text="📄 Exportar PDF", width=120, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
-        self.btn_export_pdf.pack(side="right", padx=5)
-        
-        self.btn_export_excel = ctk.CTkButton(self.bottom_bar, text="📊 Exportar Excel", width=120, height=32, fg_color="#43A047", hover_color="#2E7D32", command=self.exportar_excel)
-        self.btn_export_excel.pack(side="right", padx=5)
-
-        from tkinter import messagebox
-        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=lambda: [self.clipboard_clear(), self.clipboard_append(id_str), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
-        btn_copy_id.pack(side="right", padx=(5, 20))
-
-        self.lbl_id = ctk.CTkLabel(self.bottom_bar, text=f"Tela: {id_str}", font=("Arial", 11, "bold"), text_color="gray")
-        self.lbl_id.pack(side="right", padx=5)
-        ToolTip(btn_copy_id, "COPIAR NOME TELA")
-
-    def fechar_tela(self):
-        self.pack_forget()
-        if hasattr(self, 'hub') and hasattr(self.hub, 'modules_frame'):
-            self.hub.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
-        self.destroy()
-
-    def exportar_excel(self):
-        items = self.tree.get_children()
-        from tkinter import messagebox
-        if not items: messagebox.showwarning("Aviso", "Nenhum dado para exportar."); return
-        try:
-             columns = self.tree["columns"]; cols_titles = [self.tree.heading(c)["text"] for c in columns]; data = [self.tree.item(k)['values'] for k in items]
-             import pandas as pd, tempfile, os
-             df = pd.DataFrame(data, columns=cols_titles)
-             filepath = os.path.join(tempfile.gettempdir(), "Relatorio_Dados.xlsx")
-             
-             writer = pd.ExcelWriter(filepath, engine='openpyxl')
-             df.to_excel(writer, index=False, sheet_name='Sheet1')
-             worksheet = writer.sheets['Sheet1']
-             for i, col in enumerate(df.columns):
-                  max_len = max(df[col].astype(str).map(len).max(), len(str(col))) + 2
-                  from openpyxl.utils import get_column_letter
-                  worksheet.column_dimensions[get_column_letter(i+1)].width = max_len
-             writer.close()
-             
-             os.startfile(filepath)
-        except Exception as e: messagebox.showerror("Erro Excel", str(e))
-
-    def exportar_pdf(self):
-        items = self.tree.get_children()
-        from tkinter import messagebox
-        if not items: messagebox.showwarning("Aviso", "Nenhum dado para exportar."); return
-        try:
-             columns = self.tree["columns"]; cols_titles = [self.tree.heading(c)["text"] for c in columns]; data = [self.tree.item(k)['values'] for k in items]
-             import tempfile, os
-             filepath = os.path.join(tempfile.gettempdir(), "Relatorio_Dados.pdf")
-             import sys, subprocess
-             try: import fpdf
-             except: subprocess.run([sys.executable, "-m", "pip", "install", "fpdf"], capture_output=True); import fpdf
-             pdf = fpdf.FPDF(); pdf.add_page(); pdf.set_font("Arial", 'B', 12); pdf.cell(190, 10, "RELATORIO DE DADOS", 0, 1, 'C'); pdf.ln(5)
-             pdf.set_font("Arial", 'B', 8); num_cols = len(cols_titles); w_col = 190 / num_cols if num_cols > 0 else 30
-             for c in cols_titles: 
-                  c_str = str(c).encode('latin-1', 'replace').decode('latin-1')
-                  pdf.cell(w_col, 8, c_str, 1, 0, 'C')
-             pdf.ln(8); pdf.set_font("Arial", '', 7)
-             for r in data:
-                  for val in r: 
-                       v_str = str(val)[:20].encode('latin-1', 'replace').decode('latin-1')
-                       pdf.cell(w_col, 7, v_str, 1, 0, 'C')
-                  pdf.ln(7)
-             if hasattr(self, 'lbl_rodape_total'):
-                  pdf.ln(5); pdf.set_font("Arial", 'B', 10)
-                  txt_rodape = self.lbl_rodape_total.cget("text").encode('latin-1', 'replace').decode('latin-1')
-                  pdf.cell(190, 10, txt_rodape, 0, 1, 'R')
-             pdf.ln(5); pdf.output(filepath); os.startfile(filepath)
-        except Exception as e: messagebox.showerror("Erro PDF", str(e))
 
 class ResumoClienteWindow(BaseWindow):
     def __init__(self, parent, config):
-        super().__init__(parent, "Resumo por Cliente", "RESUMO_CLI")
+        super().__init__(parent, "Análise de Vendas por Cliente", "RESUMO_CLI")
         self.config_db = config
 
-        ctk.CTkLabel(self.top_frame, text="👤 Resumo por Cliente", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(15, 5))
+        # Filtros (Alinhados à esquerda e transparentes)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
 
-        # Filtros
-        self.filter_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.filter_frame.pack(pady=(0, 10))
 
-        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
-        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=75)
+        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=90, font=("Arial", 15))
         self.combo_ano.pack(side="left", padx=5)
         self.combo_ano.set("Todos")
 
-        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
-        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], width=110)
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], width=130, font=("Arial", 15))
         self.combo_mes.pack(side="left", padx=5)
         self.combo_mes.set("Todos")
 
-        ctk.CTkLabel(self.filter_frame, text="Listagem:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
-        self.combo_top = ctk.CTkComboBox(self.filter_frame, values=["Top 10", "Top 20", "Top 50", "Top 100", "Todos"], width=105)
+        ctk.CTkLabel(self.filter_frame, text="Listagem:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        self.combo_top = ctk.CTkComboBox(self.filter_frame, values=["Top 10", "Top 20", "Top 50", "Top 100", "Todos"], width=110, font=("Arial", 15))
         self.combo_top.pack(side="left", padx=5)
         self.combo_top.set("Top 20")
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=100)
+        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=120, font=("Arial", 13, "bold"))
         btn_processar.pack(side="right", padx=15)
+
 
         # Ajuste Colunas
         self.tree.configure(columns=("Rank", "Cod", "Nome", "Valor", "Percent"))
@@ -1704,26 +1682,26 @@ class ResumoClienteWindow(BaseWindow):
 
 class ClientesPararamWindow(BaseWindow):
     def __init__(self, parent, config):
-        super().__init__(parent, "Clientes que Pararam de Comprar", "CLI_INATIVOS")
+        super().__init__(parent, "Clientes Inativos", "CLI_INATIVOS")
         self.config_db = config
         self.emp_fil_cache = {} # Cache para armazenar (emp, fil) por item_id da treeview
 
-        ctk.CTkLabel(self.top_frame, text="🛑 Clientes Inativos", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(15, 5))
+        # Filtros (Alinhados à esquerda e transparentes)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
 
-        # Filtros
-        self.filter_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.filter_frame.pack(pady=(0, 10))
 
-        ctk.CTkLabel(self.filter_frame, text="Inativo Há:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
-        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["30 dias", "60 dias", "90 dias", "180 dias", "365 dias"], width=105)
+        ctk.CTkLabel(self.filter_frame, text="Inativo Há:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["30 dias", "60 dias", "90 dias", "180 dias", "365 dias"], width=120, font=("Arial", 15))
         self.combo_dias.pack(side="left", padx=5); self.combo_dias.set("90 dias")
 
-        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar por nome...", width=165)
+        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar por nome...", width=220, font=("Arial", 15))
         self.entry_busca.pack(side="left", padx=10)
         self.entry_busca.bind("<KeyRelease>", self.filtrar_grid)
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=100)
+        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=120, font=("Arial", 13, "bold"))
         btn_processar.pack(side="right", padx=15)
+
 
         # Ajuste Colunas
         self.tree.configure(columns=("Rank", "Cod", "Nome", "Ultima_Compra", "Dias", "Media", "Contatos"))
@@ -1980,35 +1958,50 @@ class SugestaoCompraWindow(BaseWindow):
         super().__init__(parent, "Sugestão de Compra", "SUGESTAO_COMPRA")
         self.config_db = config
 
-        ctk.CTkLabel(self.top_frame, text="🛒 Sugestão de Compra Inteligente", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(15, 5))
-        
-        self.filter_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.filter_frame.pack(fill="x", padx=20, pady=5)
+        # Barra de Filtros (Alinhada à esquerda e transparente)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="top", fill="x", padx=20, pady=0, anchor="w")
 
-        ctk.CTkLabel(self.filter_frame, text="💡 Estoque para até:", font=("Arial", 12)).pack(side="left", padx=(15, 5), pady=10)
-        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["10 dias", "20 dias", "30 dias"], width=120)
-        self.combo_dias.set("30 dias")
-        self.combo_dias.pack(side="left", padx=5)
 
-        ctk.CTkLabel(self.filter_frame, text="📁 Grupo:").pack(side="left", padx=(10, 5))
-        self.combo_grupo = ctk.CTkComboBox(self.filter_frame, width=150, command=self.selecionar_grupo)
+
+
+        ctk.CTkLabel(self.filter_frame, text="Demanda para:", font=("Arial", 14, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["10 dias", "20 dias", "30 dias"], width=110, font=("Arial", 14))
+        self.combo_dias.pack(side="left", padx=5); self.combo_dias.set("30 dias")
+
+        ctk.CTkLabel(self.filter_frame, text="Grupo:", font=("Arial", 14, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_grupo = ctk.CTkComboBox(self.filter_frame, width=150, font=("Arial", 14), command=self.selecionar_grupo)
         self.combo_grupo.pack(side="left", padx=5)
 
-        ctk.CTkLabel(self.filter_frame, text="Subgrupo:").pack(side="left", padx=(10, 5))
-        self.combo_subgrupo = ctk.CTkComboBox(self.filter_frame, width=150, command=self.selecionar_subgrupo)
+        ctk.CTkLabel(self.filter_frame, text="Sub:", font=("Arial", 14, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_subgrupo = ctk.CTkComboBox(self.filter_frame, width=150, font=("Arial", 14), command=self.selecionar_subgrupo)
         self.combo_subgrupo.pack(side="left", padx=5)
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=105)
-        btn_processar.pack(side="left", padx=10)
-
-        ctk.CTkLabel(self.filter_frame, text="🔍 Buscar:").pack(side="left", padx=(15, 5))
-        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Nome / Código...", width=160)
-        self.entry_busca.pack(side="left", padx=5)
+        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar...", width=140, font=("Arial", 14))
+        self.entry_busca.pack(side="left", padx=10)
         self.entry_busca.bind("<KeyRelease>", self.filtrar_grid)
 
-        # Frame de Tags (Filtros Ativos)
-        self.tags_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        self.tags_frame.pack(fill="x", padx=30, pady=(2, 2))
+        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
+        btn_processar.pack(side="left", padx=10, pady=2)
+
+        # Linha inferior para filtros adicionais
+        self.check_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.check_frame.pack(side="top", fill="x", padx=20, pady=(0, 5), anchor="w")
+
+        self.check_somente_compra = ctk.CTkCheckBox(self.check_frame, text="Mostrar Somente os que Precisam de Repor o Estoque", font=("Arial", 15, "bold"), text_color="#C62828", fg_color="#C62828", border_color="#B71C1C", hover_color="#EF9A9A", command=self.filtrar_grid)
+        self.check_somente_compra.pack(side="left", padx=10)
+
+
+        # Frame de Tags (Filtros Ativos) - Começa com altura 0 para não criar espaço vago
+        self.tags_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent", height=0)
+        self.tags_frame.pack(side="top", fill="x", padx=30, pady=0)
+        
+        # Ajuste para o grid colar no cabeçalho sem nenhum espaço vago
+        self.grid_frame.grid_configure(pady=0)
+
+
+
+
 
         columns = ("Rank", "Cod", "Produto", "Estoque", "Vendas3M", "MediaDia", "Demanda", "Sugestao")
         self.tree.configure(columns=columns)
@@ -2080,6 +2073,9 @@ class SugestaoCompraWindow(BaseWindow):
             sug = demanda - est
             if sug < 0: sug = 0
 
+            if hasattr(self, 'check_somente_compra') and self.check_somente_compra.get() and sug <= 0:
+                continue
+
             v_est = f"{int(est)}" if est.is_integer() else f"{est:.2f}"
             v_vend = f"{int(vendas)}" if vendas.is_integer() else f"{vendas:.2f}"
             
@@ -2150,33 +2146,31 @@ class SugestaoCompraWindow(BaseWindow):
 
 class PosicaoContasReceberWindow(BaseWindow):
     def __init__(self, parent, config):
-        super().__init__(parent, "Resumo por Tipo Venda", "POS_VENDAS")
+        super().__init__(parent, "Posição de Vendas", "POS_VENDAS")
         self.config_db = config
 
-        ctk.CTkLabel(self.top_frame, text="💰 Resumo por Tipo Venda", font=("Arial", 16, "bold")).pack(pady=10)
+        # Barra de Filtros (Alinhada à esquerda e transparente)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
 
-        # Barra de Filtros
-        self.filter_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.filter_frame.pack(pady=(0, 10))
 
-        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
-        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=90)
-        self.combo_ano.pack(side="left", padx=5)
-        self.combo_ano.set("Todos")
+        ctk.CTkLabel(self.filter_frame, text="Ano:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_ano = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=100, font=("Arial", 15))
+        self.combo_ano.pack(side="left", padx=5); self.combo_ano.set("Todos")
 
-        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 5))
         self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=110)
-        self.combo_mes.pack(side="left", padx=5)
-        self.combo_mes.set("Todos")
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=130, font=("Arial", 15))
+        self.combo_mes.pack(side="left", padx=5); self.combo_mes.set("Todos")
 
-        ctk.CTkLabel(self.filter_frame, text="Visualização:", font=("Arial", 13, "bold"), text_color="#1E293B").pack(side="left", padx=(25, 5))
-        self.seg_view = ctk.CTkSegmentedButton(self.filter_frame, values=["Tabela", "Gráfico"], command=self.alternar_visualizacao, width=140)
+        ctk.CTkLabel(self.filter_frame, text="Visualização:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(25, 5))
+        self.seg_view = ctk.CTkSegmentedButton(self.filter_frame, values=["Tabela", "Gráfico"], command=self.alternar_visualizacao, width=170, font=("Arial", 13, "bold"))
         self.seg_view.pack(side="left", padx=5)
         self.seg_view.set("Tabela")
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=100)
+        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=120, font=("Arial", 13, "bold"))
         btn_processar.pack(side="right", padx=15)
+
 
         # Ajuste Colunas
         self.tree.configure(columns=("Tipo", "Descricao", "Qtd", "Valor", "Percent"))
@@ -2346,21 +2340,22 @@ class EstoqueParadoWindow(BaseWindow):
         super().__init__(parent, "Análise de Estoque Parado", "ESTOQUE_PARADO")
         self.config_db = config
 
-        ctk.CTkLabel(self.top_frame, text="📦 Análise de Estoque Parado", font=("Arial", 16, "bold"), text_color="#1E293B").pack(pady=(15, 5))
+        # Filtros (Alinhados à esquerda e transparentes)
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
 
-        # Filtros
-        self.filter_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.filter_frame.pack(pady=(0, 10))
 
-        ctk.CTkLabel(self.filter_frame, text="Sem Giro Há:", font=("Arial", 13, "bold")).pack(side="left", padx=(10, 5))
-        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["30 dias", "60 dias", "90 dias", "180 dias", "365 dias"], width=105)
+        ctk.CTkLabel(self.filter_frame, text="Sem Giro Há:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
+        self.combo_dias = ctk.CTkComboBox(self.filter_frame, values=["30 dias", "60 dias", "90 dias", "180 dias", "365 dias"], width=120, font=("Arial", 15))
         self.combo_dias.pack(side="left", padx=5); self.combo_dias.set("90 dias")
 
-        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar produto...", width=165)
-        self.entry_busca.pack(side="left", padx=10)
+        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar produto...", width=220, font=("Arial", 15))
+        self.entry_busca.pack(side="left", padx=15)
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=100)
+        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=120, font=("Arial", 13, "bold"))
         btn_processar.pack(side="right", padx=15)
+
+
 
         # Ajuste Colunas
         self.tree.configure(columns=("Rank", "Cod", "Nome", "Ultima_Venda", "Estoque", "Custo", "Total"))
@@ -2473,6 +2468,232 @@ class EstoqueParadoWindow(BaseWindow):
         except Exception as e:
             from tkinter import messagebox
             messagebox.showerror("Erro Carregar Estoque", f"Não foi possível listar o estoque parado:\n\n{str(e)}")
+
+class AnaliseParcelasWindow(BaseWindow):
+    def __init__(self, parent, config):
+        super().__init__(parent, "Análise das Parcelas", "ANALISE_PARCELAS")
+        self.config_db = config
+
+        # Ocultar a Treeview da classe base (usada apenas no modal)
+        self.tree.pack_forget()
+
+        # Botão Processar na Top Bar
+        self.btn_processar = ctk.CTkButton(self.top_frame, text="⚙️ Processar Gráfico", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=160, font=("Arial", 13, "bold"))
+        self.btn_processar.pack(side="left", padx=20, pady=5)
+
+        # Frame para o Gráfico
+        self.chart_frame = ctk.CTkFrame(self.grid_frame, fg_color="white")
+        self.chart_frame.pack(side="top", fill="both", expand=True, padx=20, pady=20)
+
+        # Configuração do Matplotlib
+        self.fig = Figure(figsize=(10, 5), dpi=100)
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.chart_frame)
+        self.canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
+
+        # Evento de clique no gráfico
+        self.canvas.mpl_connect('button_press_event', self.on_click)
+
+        self.df_parcelas = None
+        self.faixas_info = [] # Armazena range e label de cada barra
+        self.bars = None
+
+        self.after(100, self.carregar_dados)
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            import pandas as pd
+            from datetime import datetime
+
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str)
+            
+            # Query com JOIN para pegar dados do cliente e filtro de Flag 'A', excluindo CodC = 1
+            query = """
+                SELECT 
+                    c2.CRMov2CodC as CodC, 
+                    c2.CRMov2DesC as Nome, 
+                    c3.CRMov3DtaV as Vencimento, 
+                    c3.CRMov3VlAb as Valor
+                FROM crmov3 c3
+                INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod 
+                                   AND c3.CMFilCod = c2.CMFilCod 
+                                   AND c3.CRMovDta = c2.CRMovDta 
+                                   AND c3.CRMovSeq = c2.CRMovSeq
+                WHERE c3.CRMov3VlAb > 0 
+                  AND c3.CRMov3Flag = 'A'
+                  AND c2.CRMov2CodC <> 1
+            """
+            self.df_parcelas = pd.read_sql(query, conn)
+            conn.close()
+
+            if self.df_parcelas.empty:
+                self.ax.clear()
+                self.ax.set_title("NENHUMA PARCELA 'ABERTA' ENCONTRADA")
+                self.canvas.draw()
+                return
+
+            hoje = datetime.now()
+            self.df_parcelas['Vencimento'] = pd.to_datetime(self.df_parcelas['Vencimento'])
+            self.df_parcelas['dias_diff'] = (self.df_parcelas['Vencimento'] - hoje).dt.days
+
+            # Faixas definidas pelo usuário
+            faixas = [
+                # VENCIDAS
+                (-99999, -360, "+360d", "#B71C1C"),
+                (-360, -180, "+180d", "#C62828"),
+                (-180, -90, "+90d", "#D32F2F"),
+                (-90, -60, "+60d", "#E53935"),
+                (-60, -30, "+30d", "#EF5350"),
+                (-30, 0, "Até 30d", "#F44336"),
+                # A VENCER
+                (0, 31, "Até 30d", "#4CAF50"),
+                (31, 61, "30d", "#43A047"),
+                (61, 91, "60d", "#388E3C"),
+                (91, 181, "90d", "#2E7D32"),
+                (181, 361, "180d", "#1B5E20"),
+                (361, 99999, "+360d", "#004D40")
+            ]
+
+            self.faixas_info = faixas
+            labels_x = []
+            valores_y = []
+            cores = []
+
+            for start, end, label, cor in faixas:
+                soma = self.df_parcelas[(self.df_parcelas['dias_diff'] >= start) & (self.df_parcelas['dias_diff'] < end)]['Valor'].sum()
+                labels_x.append(label)
+                valores_y.append(soma)
+                cores.append(cor)
+
+            self.ax.clear()
+            self.bars = self.ax.bar(labels_x, valores_y, color=cores, width=0.7, picker=True)
+            
+            self.ax.set_title("ANÁLISE DE VENCIMENTOS (PARCELAS ABERTAS)", fontsize=14, fontweight='bold', pad=25)
+            self.ax.set_ylabel("Valor Total (R$)", fontsize=11)
+            self.ax.tick_params(axis='x', rotation=0, labelsize=9)
+            
+            for bar in self.bars:
+                height = bar.get_height()
+                if height > 0:
+                    self.ax.text(bar.get_x() + bar.get_width()/2., height,
+                                f'R$ {height:,.0f}'.replace(',', '.'),
+                                ha='center', va='bottom', fontsize=8, fontweight='bold')
+
+            from matplotlib.patches import Patch
+            legend_elements = [
+                Patch(facecolor='#C62828', label='Parcelas Vencidas'),
+                Patch(facecolor='#2E7D32', label='Parcelas A Vencer')
+            ]
+            self.ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=2, frameon=False)
+
+            self.ax.spines['top'].set_visible(False)
+            self.ax.spines['right'].set_visible(False)
+            self.fig.tight_layout()
+            self.canvas.draw()
+
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro Carregar Parcelas", f"Erro no processamento:\n{str(e)}")
+
+    def on_click(self, event):
+        if event.inaxes != self.ax: return
+        for i, bar in enumerate(self.bars):
+            if bar.contains(event)[0]:
+                label_txt = self.faixas_info[i][2]
+                start, end = self.faixas_info[i][0], self.faixas_info[i][1]
+                tipo = "Vencidas" if start < 0 else "A Vencer"
+                self.abrir_detalhes(f"{tipo} ({label_txt})", start, end)
+                break
+
+    def abrir_detalhes(self, titulo_faixa, start, end):
+        if self.df_parcelas is None: return
+        
+        # Filtrar dados da faixa
+        df_sub = self.df_parcelas[(self.df_parcelas['dias_diff'] >= start) & (self.df_parcelas['dias_diff'] < end)].copy()
+        if df_sub.empty: return
+
+        # Criar Janela Toplevel
+        top = ctk.CTkToplevel(self)
+        top.title(f"Detalhes: {titulo_faixa}")
+        top.geometry("800x500")
+        top.after(10, lambda: top.focus_force())
+        top.grab_set() # Modal
+
+        # Centralizar
+        x = self.winfo_screenwidth() // 2 - 400
+        y = self.winfo_screenheight() // 2 - 250
+        top.geometry(f"800x500+{x}+{y}")
+
+        # Label Título
+        ctk.CTkLabel(top, text=f"📄 LISTA DE PARCELAS - {titulo_faixa}", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=15)
+
+        # Frame para o Grid
+        f_grid = ctk.CTkFrame(top)
+        f_grid.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Treeview com Zebra
+        cols = ("Cod", "Nome", "Vencimento", "Valor")
+        tree = ttk.Treeview(f_grid, columns=cols, show="headings", height=15)
+        tree.pack(fill="both", expand=True, side="left")
+
+        # Configuração de Cores para o Zebra
+        tree.tag_configure('even', background='#FFFFFF')
+        tree.tag_configure('odd', background='#E2E8F0')
+
+        # Scrollbar
+        scb = ttk.Scrollbar(f_grid, orient="vertical", command=tree.yview)
+        scb.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=scb.set)
+
+        tree.heading("Cod", text="Cód. Cliente")
+        tree.heading("Nome", text="Nome do Cliente")
+        tree.heading("Vencimento", text="Vencimento")
+        tree.heading("Valor", text="Valor Aberto")
+
+        tree.column("Cod", width=100, anchor="center")
+        tree.column("Nome", width=350)
+        tree.column("Vencimento", width=120, anchor="center")
+        tree.column("Valor", width=120, anchor="e")
+
+        # Inserir dados com Zebra
+        total_acumulado = 0
+        for i, (_, row) in enumerate(df_sub.sort_values('Vencimento').iterrows()):
+            v_ab = float(row['Valor'])
+            total_acumulado += v_ab
+            tag = 'even' if i % 2 == 0 else 'odd'
+            tree.insert("", "end", values=(
+                str(int(row['CodC'])),
+                str(row['Nome']).strip(),
+                row['Vencimento'].strftime('%d/%m/%Y'),
+                f"R$ {v_ab:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            ), tags=(tag,))
+
+        # Rodapé com total
+        ctk.CTkLabel(top, text=f"💰 TOTAL DESTA FAIXA: R$ {total_acumulado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'), font=("Arial", 14, "bold")).pack(pady=10)
+
+        # Identificador de Tela (Nome Exclusivo) no Canto Inferior Direito
+        f_id = ctk.CTkFrame(top, fg_color="transparent")
+        f_id.pack(side="bottom", fill="x", padx=20, pady=(0, 10))
+
+        btn_fechar_det = ctk.CTkButton(f_id, text="✖ Fechar", width=90, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), border_width=1, border_color="black", command=top.destroy)
+        btn_fechar_det.pack(side="left")
+
+        btn_copy_det = ctk.CTkButton(f_id, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), 
+                                    command=lambda: [top.clipboard_clear(), top.clipboard_append("ANALISE_PARCELAS_DET"), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
+        btn_copy_det.pack(side="right")
+
+        lbl_id_det = ctk.CTkLabel(f_id, text="Tela: ANALISE_PARCELAS_DET", font=("Arial", 11, "bold"), text_color="gray")
+        lbl_id_det.pack(side="right", padx=5)
+
+        ToolTip(btn_copy_det, "COPIAR NOME TELA")
+
+    def exportar_pdf(self): pass
+    def exportar_excel(self): pass
+
+    def exportar_pdf(self): pass
+    def exportar_excel(self): pass
 
 if __name__ == '__main__':
     import sys, argparse
