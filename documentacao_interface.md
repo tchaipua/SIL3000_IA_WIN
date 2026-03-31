@@ -1,41 +1,35 @@
-# 🖥️ Documentação da Interface (Python + CustomTkinter)
+# Documentação de Interface - SIL3000_IA_WIN
 
-Esta documentação reúne soluções técnicas e padrões de arquitetura adotados para evitar bugs visuais e estabilizar a navegação.
+## 1. Padrões de Grid (Tabelas)
+O sistema utiliza um padrão avançado de "Excel Mirroring" para exibição de dados e totais.
 
----
-
-## ⚠️ Bug de Geometria do CustomTkinter (Tela Branca)
-
-### 🔴 O Problema
-Ao transitar entre janelas usando `.pack_forget()` no Dashboard (`modules_frame`) e abrir um módulo novo, as colunas internas e filhos às vezes perdiam o cálculo automático de largura/altura (geometria) do Windows. 
-O widget existia na memória, mas a renderização ficava travada em **0x0 pixels**, resultando em uma **tela totalmente branca** (ou cinza).
-
-### 🟢 A Solução (Resize Trick)
-Para **forçar** o motor do Windows a disparar o recalculo de layout (Redraw) de forma reativa e instantânea, foi inserido uma rotina de *micro-redimensionamento* de 1 pixel nas funções de transição de tela do `MainHub`:
-
+### 1.1 Configuração do Grid
+Toda tela que contém listagem deve herdar de `BaseWindow` e utilizar o método `self.configurar_grid`:
 ```python
-        self.update()
-        w = self.winfo_width(); h = self.winfo_height()
-        if w > 1 and h > 1:
-             self.geometry(f"{w+1}x{h}")
-             self.after(5, lambda: self.geometry(f"{w}x{h}"))
+self.configurar_grid(
+    columns=("Col1", "Col2"),
+    headings=("Título 1", "Título 2"),
+    widths=(100, 200),
+    aligns=("center", "e")
+)
 ```
 
-### 📍 Onde está implementado?
--   `MainHub.abrir_modulo()`: Dispara ao **entrar** em uma tela (Sugestão, CEP, etc).
--   `MainHub.fechar_modulo_atual()`: Dispara ao **sair** de uma tela e retornar ao Dashboard.
+### 1.2 Totais Estilo Excel
+- **Localização**: Sempre fixos no `summary_frame` (azul marinho `#0D47A1`).
+- **Visibilidade**: Devem permanecer estáticos na base do grid, não sumindo durante o scroll.
+- **Alinhamento**: Devem utilizar o `self.tree_totais` para garantir sincronia milimétrica com as colunas do grid principal.
+- **Formatação**: Valores monetários alinhados à direita (`anchor="e"`), quantidades centralizadas.
 
----
+## 2. Cores e Identidade
+- **Barra Lateral**: `#0D47A1` (Azul Marinho)
+- **Cabeçalhos de Grid**: `#D1D5DB` (Cinza Claro) com texto Preto
+- **Linhas Zebradas**: Branco (`#FFFFFF`) e Cinza Azulado (`#E2E8F0`)
+- **Linha de Totais**: Fundo `#0D47A1`, Texto Branco, Fonte Negrito
 
-## 🔒 Controle de Saída do Sistema
+## 3. Navegação
+- **Acesso Rápido**: Onde houver necessidade de detalhamento (ex: parcelas), clicar uma vez sobre a linha do grid deve abrir automaticamente a tela de detalhes.
+- **Scroll**: Todos os grids devem possuir barra de rolagem lateral (`ttk.Scrollbar`) configurada via `BaseWindow`.
 
-### 🔴 O Problema
-Saídas acidentais pelo botão **X** do Windows podem causar perda de processos em background ou travar o socket do Banco de Dados.
-
-### 🟢 A Solução (Trava de Segurança)
--   **Remoção Funcional (Desabilitado)**: Através de chamadas `ctypes.windll.user32`, o botão **X** do canto superior direito da janela principal foi desabilitado (fica cinza).
--   **Bloqueio de Alt+F4**: `self.protocol("WM_DELETE_WINDOW", lambda: None)` bloqueia o atalho de teclado tradicional.
--   **Canal Único**: A saída agora deve ser feita exclusivamente pelo botão **❌ Sair do Sistema** na barra lateral.
-
----
-*MSINFOR Sistemas - 2026*
+## 4. Botões de Rodapé
+- **Localização**: Sempre na `self.bottom_bar` (row 3).
+- **Ações Padrão**: Fechar Tela (esquerda), Exportar PDF/Excel (direita).

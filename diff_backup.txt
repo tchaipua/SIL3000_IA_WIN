@@ -1,0 +1,1542 @@
+diff --git a/SIL_IA_WIN.py b/SIL_IA_WIN.py
+index 3369baa..0c3fe52 100644
+--- a/SIL_IA_WIN.py
++++ b/SIL_IA_WIN.py
+@@ -183,6 +183,10 @@ class ConfigWindow(ctk.CTkToplevel):
+         self.e_banco = self.criar_input("Banco de Dados", config["banco"])
+         self.e_user = self.criar_input("Usuário do Banco", config["usuario_bd"])
+         self.e_senha = self.criar_input("Senha do Banco", config["senha_bd"], show="*")
++        
++        # Novos campos multi-empresa
++        self.e_empresa = self.criar_input("Código Empresa (CMEmpCod)", config.get("empresa", "01"))
++        self.e_filial = self.criar_input("Código Filial (CMFilCod)", config.get("filial", "01"))
+ 
+     def copiar_id(self, texto):
+         self.clipboard_clear()
+@@ -742,6 +746,10 @@ class AnaliseVendasWindow(ctk.CTkFrame):
+             command=self.fechar_tela
+         )
+         self.btn_sair.pack(side="left")
++        
++        # Rodapé de Totais (Novo)
++        self.lbl_vendas_total = ctk.CTkLabel(self.buttons_frame, text="", font=("Arial", 15, "bold"), text_color="#1565C0")
++        self.lbl_vendas_total.pack(side="left", padx=30)
+ 
+         # Exportações
+         self.btn_export_pdf = ctk.CTkButton(self.buttons_frame, text="📄 Exportar PDF", width=140, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
+@@ -805,18 +813,38 @@ class AnaliseVendasWindow(ctk.CTkFrame):
+         self.df_grouped = None
+         self.after(100, self.carregar_dados)
+ 
++    def get_sql_summary(self):
++        emp = self.config.get("empresa", "01")
++        return (
++            "TABELA:\n"
++            "- CRMOV2 (Vendas)\n\n"
++            "CAMPOS UTILIZADOS:\n"
++            "- CRMovDta: Para extrair Ano, Mês e Dia da Semana\n"
++            "- CRMov2CHor: Para extrair Faixa de Horário\n"
++            "- CRMov2VlrO: Valor Base das Vendas\n"
++            "- CMEmpCod: Filtro de Empresa\n"
++            "- CRMov2Flag: Situação da Venda (A, F)\n\n"
++            "FILTRO BASE:\n"
++            f"- CMEmpCod = '{emp}'\n"
++            "- CRMov2Flag IN ('A', 'F')\n"
++            "- CRMovDta IS NOT NULL"
++        )
++
+     def copiar_id(self, texto):
+         self.clipboard_clear()
+         self.clipboard_append(texto)
+         self.update()
+-        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
++        sql_summary = self.get_sql_summary()
++        from tkinter import messagebox
++        messagebox.showinfo("ID Copiado + SQL Info", f"ID da Tela: {texto}\n\n--- RESUMO TÉCNICO SQL ---\n{sql_summary}")
+ 
+     def carregar_dados(self):
+         try:
+             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config['servidor']};DATABASE={self.config['banco']};UID={self.config['usuario_bd']};PWD={self.config['senha_bd']}"
+             conn = pyodbc.connect(conn_str)
+-            query = "SELECT CRMovDta, CRMov2CHor, CRMov2VlrO FROM crmov2 WHERE CRMovDta IS NOT NULL AND CRMov2Flag IN ('A', 'F')"
+-            self.df_raw = pd.read_sql(query, conn)
++            emp_val = self.config.get("empresa", "01")
++            query = "SELECT CRMovDta, CRMov2CHor, CRMov2VlrO FROM crmov2 WHERE CRMovDta IS NOT NULL AND CRMov2Flag IN ('A', 'F') AND CMEmpCod = ?"
++            self.df_raw = pd.read_sql(query, conn, params=(emp_val,))
+             conn.close()
+             
+             # Limpeza de dados básica
+@@ -973,7 +1001,26 @@ class AnaliseVendasWindow(ctk.CTkFrame):
+             label_x = self.df_grouped.iloc[idx][grouper_plot]
+             qtd = self.df_grouped.iloc[idx]['Qtd']
+             valor = self.df_grouped.iloc[idx]['ValorTotal']
+-            texto = f"{label_x}\n----------------\nVendas: {qtd}\nTotal: R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
++            
++            # Totais para cálculo de %
++            total_qtd = self.df_grouped['Qtd'].sum()
++            total_vlr = self.df_grouped['ValorTotal'].sum()
++            
++            perc_qtd = (qtd / total_qtd * 100) if total_qtd > 0 else 0
++            perc_vlr = (valor / total_vlr * 100) if total_vlr > 0 else 0
++
++            # Formatar faixa se for horário (ex: 5 -> 5-6h)
++            try:
++                if self.combo_visao.get() == "Horário":
++                    h = int(float(label_x))
++                    label_x = f"Horário das {h}-{h+1}h"
++            except: pass
++
++            fmt_v = f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
++            texto = (f"{label_x}\n----------------\n"
++                    f"Quantidade: {qtd} ({perc_qtd:.1f}%)\n"
++                    f"Valor: {fmt_v} ({perc_vlr:.1f}%)\n")
++            
+             sel.annotation.set_text(texto)
+             sel.annotation.get_bbox_patch().set(boxstyle="round,pad=0.5", fc="white", alpha=0.9, ec="#1E88E5")
+         
+@@ -986,6 +1033,11 @@ class AnaliseVendasWindow(ctk.CTkFrame):
+         if "Valor" in metrica:
+             self.ax.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')))
+             
++        # Atualizar Rodapé de Totais
++        total_vendas_periodo = self.df_grouped['ValorTotal'].sum()
++        total_vendas_qtd = self.df_grouped['Qtd'].sum()
++        self.lbl_vendas_total.configure(text=f"🛒 TOTAL DE VENDAS: {total_vendas_qtd:,}  |  💰 VALOR TOTAL: R$ {total_vendas_periodo:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
++
+         self.fig.tight_layout()
+         self.canvas.draw()
+         
+@@ -1101,7 +1153,7 @@ class MainHub(ctk.CTk):
+         self.btn_resumo_cli = ctk.CTkButton(self.col1_frame, text="🛍️ Análise Compras por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
+         self.btn_resumo_cli.pack(pady=8, padx=15)
+ 
+-        self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
++        self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Deixaram de Comprar", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
+         self.btn_pararam.pack(pady=8, padx=15)
+ 
+         self.btn_contas = ctk.CTkButton(self.col1_frame, text="💰 Resumo por Tipo Venda", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
+@@ -1121,9 +1173,12 @@ class MainHub(ctk.CTk):
+         self.btn_parcelas = ctk.CTkButton(self.col2_frame, text="💳 Análise das Parcelas", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_analise_parcelas, fg_color="#1E88E5", hover_color="#1565C0")
+         self.btn_parcelas.pack(pady=8, padx=15)
+ 
+-        self.btn_cobranca = ctk.CTkButton(self.col2_frame, text="📞 Cobrança por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=lambda: None, fg_color="#1E88E5", hover_color="#1565C0")
++        self.btn_cobranca = ctk.CTkButton(self.col2_frame, text="📞 Cobrança por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_cobranca, fg_color="#1E88E5", hover_color="#1565C0")
+         self.btn_cobranca.pack(pady=8, padx=15)
+ 
++        self.btn_excluir_inativos = ctk.CTkButton(self.col2_frame, text="🗑️ Excluir Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_excluir_inativos, fg_color="#C62828", hover_color="#B12020")
++        self.btn_excluir_inativos.pack(pady=8, padx=15)
++
+         # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
+         for col_idx in range(2, 5):
+              f = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#E2E8F0")
+@@ -1239,6 +1294,17 @@ class MainHub(ctk.CTk):
+     def abrir_estoque_parado(self): self.abrir_modulo(EstoqueParadoWindow)
+     def abrir_sugestao_compra(self): self.abrir_modulo(SugestaoCompraWindow)
+     def abrir_analise_parcelas(self): self.abrir_modulo(AnaliseParcelasWindow)
++    def abrir_cobranca(self): self.abrir_modulo(CobrancaClienteWindow)
++    def abrir_excluir_inativos(self): self.abrir_modulo(ExcluirClientesInativosWindow)
++
++    def abrir_modulo_detalhes_inativos(self, cod, nome):
++        if hasattr(self, "modulo_atual") and self.modulo_atual:
++             self.modulo_atual.destroy()
++        self.modules_frame.pack_forget()
++        from __main__ import DetalhesParcelasInativosWindow
++        self.modulo_atual = DetalhesParcelasInativosWindow(self.main_frame, self.config, cod, nome)
++        self.modulo_atual.hub = self
++        self.modulo_atual.pack(fill="both", expand=True)
+ 
+ def centralizar_tela(tela, w, h):
+     x = (tela.winfo_screenwidth() // 2) - (w // 2)
+@@ -1280,16 +1346,33 @@ class BaseWindow(ctk.CTkFrame):
+ 
+         style = ttk.Style()
+         style.configure(id_str + ".Treeview", background="#FFFFFF", fieldbackground="#FFFFFF", foreground="black", rowheight=32, font=("Arial", 11))
+-        style.configure(id_str + ".Treeview.Heading", background="#1565C0", foreground="white", font=("Arial", 11, "bold"))
++        # Cabeçalho com fundo Cinza Médio e Texto Preto para contraste máximo
++        style.configure(id_str + ".Treeview.Heading", background="#D1D5DB", foreground="black", font=("Arial", 11, "bold"))
+ 
+-        self.tree = ttk.Treeview(self.grid_frame, show="headings", selectmode="browse")
++        self.tree = ttk.Treeview(self.grid_frame, show="headings", selectmode="browse", style=id_str + ".Treeview")
+         self.tree.pack(fill="both", expand=True, side="left")
++        
++        # Barra de Rolagem Lateral (Scrollbar)
++        self.sb = ttk.Scrollbar(self.grid_frame, orient="vertical", command=self.tree.yview)
++        self.sb.pack(side="right", fill="y")
++        self.tree.configure(yscrollcommand=self.sb.set)
++
+         self.tree.tag_configure('even', background='#FFFFFF')
+         self.tree.tag_configure('odd', background='#E2E8F0')
+ 
+-        # Rodape (Transparente para consistência)
++        # --- PADRÃO SISTEMA: Treeview de Totais Fixo (Sincronizado) ---
++        style_total = ttk.Style()
++        style_total.configure("Total.Treeview", background="#0D47A1", fieldbackground="#0D47A1", foreground="white", rowheight=35, font=("Arial", 12, "bold"))
++        
++        self.summary_frame = ctk.CTkFrame(self, fg_color="#0D47A1", height=40, corner_radius=0)
++        self.summary_frame.grid(row=2, column=0, sticky="ew", padx=20)
++        
++        # O self.tree_totais será configurado dinamicamente via configurar_grid
++        self.tree_totais = None
++
++        # Rodape (Transparente para consistência) - movido para row 3
+         self.bottom_bar = ctk.CTkFrame(self, fg_color="transparent", height=40, corner_radius=0)
+-        self.bottom_bar.grid(row=2, column=0, sticky="ew")
++        self.bottom_bar.grid(row=3, column=0, sticky="ew")
+         
+         btn_sair = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", command=self.fechar_tela, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 12, "bold"), border_width=2, border_color="black", width=130)
+         btn_sair.pack(side="left", padx=20, pady=5)
+@@ -1301,13 +1384,44 @@ class BaseWindow(ctk.CTkFrame):
+         self.btn_export_excel = ctk.CTkButton(self.bottom_bar, text="📊 Exportar Excel", width=120, height=32, fg_color="#43A047", hover_color="#2E7D32", command=self.exportar_excel)
+         self.btn_export_excel.pack(side="right", padx=5)
+ 
+-        from tkinter import messagebox
+-        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=lambda: [self.clipboard_clear(), self.clipboard_append(id_str), messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")])
++        self.id_str = id_str
++        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=self.acao_copiar_e_sql)
+         btn_copy_id.pack(side="right", padx=(5, 20))
+ 
+         self.lbl_id = ctk.CTkLabel(self.bottom_bar, text=f"Tela: {id_str}", font=("Arial", 11, "bold"), text_color="gray")
+         self.lbl_id.pack(side="right", padx=5)
+-        ToolTip(btn_copy_id, "COPIAR NOME TELA")
++        ToolTip(btn_copy_id, "COPIAR NOME TELA E VER SQL")
++
++    def acao_copiar_e_sql(self):
++        self.clipboard_clear()
++        self.clipboard_append(self.id_str)
++        summary = self.get_sql_summary()
++        msg = f"NOME DA TELA COPIADO: {self.id_str}"
++        if summary:
++            msg += "\n\n--- ESTRUTURA SQL (RESUMO) ---\n" + summary
++        messagebox.showinfo("Informação do Sistema", msg)
++
++    def configurar_grid(self, columns, headings, widths, alignments=None, stretches=None):
++        """Metodo padrao para configurar grid principal e totais simultaneamente"""
++        self.tree.configure(columns=columns)
++        self.tree_totais = ttk.Treeview(self.summary_frame, show="", height=1, style="Total.Treeview", columns=columns)
++        self.tree_totais.pack(fill="x", side="left", expand=True)
++
++        # Adicionar compensador de scrollbar no resumo
++        dummy_sb = ctk.CTkFrame(self.summary_frame, width=16, fg_color="#0D47A1", corner_radius=0)
++        dummy_sb.pack(side="right", fill="y")
++
++        for i, col in enumerate(columns):
++            align = alignments[i] if alignments else "center"
++            width = widths[i] if widths else 100
++            stretch = stretches[i] if stretches else True
++            
++            # Configurar Main Tree
++            self.tree.heading(col, text=headings[i], anchor=align)
++            self.tree.column(col, width=width, anchor=align, stretch=stretch)
++            
++            # Configurar Totals Tree (Sincronizada)
++            self.tree_totais.column(col, width=width, anchor=align, stretch=stretch)
+ 
+     def fechar_tela(self):
+         self.pack_forget()
+@@ -1402,14 +1516,49 @@ class AnaliseProdutoWindow(BaseWindow):
+         btn_processar = ctk.CTkButton(self.filter_frame, text="🔍 Atualizar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
+         btn_processar.pack(side="left", padx=15)
+ 
+-        # Ajuste Colunas
+-        self.tree.configure(columns=("Rank", "Cod", "Desc", "Qtd", "Venda", "Lucro"))
+-        self.tree.heading("Rank", text="🏆 #"); self.tree.heading("Cod", text="🔑 Código"); self.tree.heading("Desc", text="📦 Produto"); self.tree.heading("Qtd", text="🛒 Qtd"); self.tree.heading("Venda", text="💰 Total Venda"); self.tree.heading("Lucro", text="📈 Lucro")
+-        self.tree.column("Rank", width=50, anchor="center"); self.tree.column("Cod", width=90, anchor="center"); self.tree.column("Desc", width=350); self.tree.column("Qtd", width=90, anchor="center"); self.tree.column("Venda", width=160, anchor="e"); self.tree.column("Lucro", width=150, anchor="e")
++        # Usando o novo padrao BaseWindow
++        cols = ("Rank", "Cod", "Desc", "Qtd", "Venda", "Lucro")
++        heads = ("🏆 #", "🔑 Código", "📦 Produto", "🛒 Qtd", "💰 Total Venda", "📈 Lucro")
++        wids = (50, 90, 350, 90, 160, 150)
++        aligns = ("center", "center", "w", "center", "e", "e")
++        self.configurar_grid(cols, heads, wids, aligns)
+ 
+         # Bootstrap
+         self.after(200, self.carregar_anos)
+ 
++    def get_sql_summary(self):
++        ano = self.combo_ano.get()
++        mes = self.combo_mes.get()
++        pesquisa = self.txt_pesquisa.get().strip()
++        emp_padrao = self.config_db.get("empresa", "01")
++        
++        where = ["c2.CMEmpCod = '" + emp_padrao + "'", "c4.CRMovDta IS NOT NULL", "YEAR(c4.CRMovDta) != 9999", "c2.CRMov2Flag IN ('A', 'F')"]
++        if ano != "Todos": where.append(f"YEAR(c4.CRMovDta) = {int(ano)}")
++        if mes != "Todos": 
++            try: mes_idx = self.meses_ext.index(mes); where.append(f"MONTH(c4.CRMovDta) = {mes_idx}")
++            except: pass
++        if pesquisa: where.append(f"p.CEProDes LIKE '%{pesquisa}%'")
++        
++        where_str = "\n  AND ".join(where)
++        
++        return (
++            "TABELA PRINCIPAL:\n"
++            "- CEPRO p (Produtos)\n"
++            "- CRMOV4 c4 (Itens Movimento)\n"
++            "- CRMOV2 c2 (Cabeçalho)\n\n"
++            "CAMPOS UTILIZADOS:\n"
++            "- p.CEProCod: Código do Produto (JOIN)\n"
++            "- p.CEProDes: Descrição do Produto (Filtro Busca)\n"
++            "- c4.CRMov4Qtd: Quantidade Vendida (Soma)\n"
++            "- c4.CRMov4VlrO: Valor Bruto Item (Soma)\n"
++            "- c4.CRMov4VlrC: Custo do Item (Soma p/ Lucro)\n"
++            "- c4.CRMovDta: Data Base p/ Filtros\n"
++            "- c2.CMEmpCod: Código da Empresa\n"
++            "- c2.CRMov2Flag: Filtro de Venda Ativa (A, F)\n\n"
++            "FILTRO ATUAL (WHERE):\n"
++            f"  {where_str}"
++        )
++
+ 
+     def carregar_anos(self):
+         server = self.config_db.get("servidor")
+@@ -1469,19 +1618,27 @@ class AnaliseProdutoWindow(BaseWindow):
+             """
+             df = pd.read_sql(query, conn); conn.close()
+ 
++            total_qtd = 0.0
++            total_venda = 0.0
++            total_lucro = 0.0
++            def format_money(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++
+             for index, row in df.iterrows():
+                 try: cod_pro = str(int(float(row['CEProCod'])))
+                 except: cod_pro = str(row['CEProCod']).strip()
+ 
+-                try: qtd_int = int(float(row['TotalQtd'])); qtd = f"{qtd_int:,}".replace(",", ".")
++                try: 
++                    q_val = float(row['TotalQtd'])
++                    total_qtd += q_val
++                    qtd_int = int(q_val); qtd = f"{qtd_int:,}".replace(",", ".")
+                 except: qtd = str(row['TotalQtd'])
+ 
+                 try:
+                     venda_val = float(row.get('TotalVenda', 0))
+                     custo_val = float(row.get('TotalCusto', 0))
+                     lucro_val = venda_val - custo_val
+-                    
+-                    def format_money(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++                    total_venda += venda_val
++                    total_lucro += lucro_val
+                     
+                     venda_str = format_money(venda_val)
+                     lucro_str = format_money(lucro_val)
+@@ -1489,6 +1646,11 @@ class AnaliseProdutoWindow(BaseWindow):
+                     venda_str = lucro_str = "R$ 0,00"
+ 
+                 self.tree.insert("", "end", values=(index + 1, cod_pro, row['CEProDes'].strip(), qtd, venda_str, lucro_str), tags=('even' if index % 2 == 0 else 'odd',))
++
++            # Atualizar Treeview de Totais (Padrao Excel)
++            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
++            self.tree_totais.insert("", "end", values=(f" TOTAIS ({len(df)}):", "", "", f"{total_qtd:,.0f}".replace(",", "."), format_money(total_venda), format_money(total_lucro)))
++
+         except Exception as e:
+             from tkinter import messagebox
+             messagebox.showerror("Erro de Filtro", f"Não foi possível carregar os produtos:\n\n{str(e)}")
+@@ -1614,12 +1776,44 @@ class ResumoClienteWindow(BaseWindow):
+ 
+         self.after(200, self.carregar_anos)
+ 
++    def get_sql_summary(self):
++        ano = self.combo_ano.get()
++        mes = self.combo_mes.get()
++        emp = self.config_db.get("empresa", "01")
++        meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
++        
++        where = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999", f"CMEmpCod = '{emp}'", "CRMov2CodC NOT IN (1)"]
++        if ano != "Todos": where.append(f"YEAR(CRMovDta) = {int(ano)}")
++        if mes != "Todos": 
++            try: mes_idx = meses_ext.index(mes); where.append(f"MONTH(CRMovDta) = {mes_idx}")
++            except: pass
++            
++        where_str = "\n  AND ".join(where)
++        limit = self.combo_top.get().replace("Top ", "")
++        
++        return (
++            "TABELA:\n"
++            "- CRMOV2 (Vendas)\n\n"
++            "CAMPOS UTILIZADOS:\n"
++            "- CRMov2CodC: Código do Cliente (Agrupamento)\n"
++            "- CRMov2DesC: Razão Social/Nome do Cliente\n"
++            "- CRMov2VlrO: Valor Bruto da Venda (Soma)\n"
++            "- CRMovDta: Data da Venda (Filtro Ano/Mês)\n"
++            "- CMEmpCod: Código da Empresa\n"
++            "- CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
++            "FILTRO ATUAL (WHERE):\n"
++            f"  {where_str}\n\n"
++            "AGRUPAMENTO (GROUP BY):\n"
++            f"  CRMov2CodC, CRMov2DesC (Limitado a TOP {limit})"
++        )
++
+     def carregar_anos(self):
+         try:
+             import pyodbc; import pandas as pd
+             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+             conn = pyodbc.connect(conn_str)
+-            df_anos = pd.read_sql("SELECT DISTINCT YEAR(CRMovDta) as Ano FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999", conn)
++            emp_val = self.config_db.get("empresa", "01")
++            df_anos = pd.read_sql("SELECT DISTINCT YEAR(CRMovDta) as Ano FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999 AND CMEmpCod = ?", conn, params=(emp_val,))
+             anos = sorted(df_anos['Ano'].dropna().unique().tolist(), reverse=True)
+             self.combo_ano.configure(values=["Todos"] + [str(int(a)) for a in anos])
+             self.combo_ano.set("Todos")
+@@ -1634,11 +1828,12 @@ class ResumoClienteWindow(BaseWindow):
+             ano = self.combo_ano.get()
+             mes = self.combo_mes.get()
+             top = self.combo_top.get()
++            emp_val = self.config_db.get("empresa", "01")
+ 
+             limit = ""
+             if top.startswith("Top"): limit = f"TOP {top.replace('Top ', '')} "
+ 
+-            where_clauses = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999"]
++            where_clauses = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999", f"CMEmpCod = '{emp_val}'"]
+             if ano != "Todos": where_clauses.append(f"YEAR(CRMovDta) = {int(ano)}")
+             if mes != "Todos": 
+                 meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+@@ -1704,16 +1899,31 @@ class ClientesPararamWindow(BaseWindow):
+ 
+ 
+         # Ajuste Colunas
+-        self.tree.configure(columns=("Rank", "Cod", "Nome", "Ultima_Compra", "Dias", "Media", "Contatos"))
+-        self.tree.heading("Rank", text="#", command=lambda: self.sort_column("Rank", False))
+-        self.tree.heading("Cod", text="Cód Cliente", command=lambda: self.sort_column("Cod", False))
+-        self.tree.heading("Nome", text="Nome do Cliente", command=lambda: self.sort_column("Nome", False))
+-        self.tree.heading("Ultima_Compra", text="Última Compra", command=lambda: self.sort_column("Ultima_Compra", False))
+-        self.tree.heading("Dias", text="Dias Inativo", command=lambda: self.sort_column("Dias", False))
+-        self.tree.heading("Media", text="Média/Ano", command=lambda: self.sort_column("Media", False))
+-        self.tree.heading("Contatos", text="Telefones")
++        self.headers_dict = {
++            "Rank": "#",
++            "Cod": "Cód Cliente",
++            "Nome": "Nome do Cliente",
++            "Ultima_Compra": "Última Compra",
++            "Dias": "Dias Inativo",
++            "Media": "Média/Ano",
++            "Contatos": "Telefones"
++        }
+         
+-        self.tree.column("Rank", width=40, anchor="center"); self.tree.column("Cod", width=80, anchor="center"); self.tree.column("Nome", width=280); self.tree.column("Ultima_Compra", width=110, anchor="center"); self.tree.column("Dias", width=100, anchor="center"); self.tree.column("Media", width=130, anchor="e"); self.tree.column("Contatos", width=110, anchor="center")
++        self.tree.configure(columns=tuple(self.headers_dict.keys()))
++        for col, head in self.headers_dict.items():
++            self.tree.heading(col, text=head + " ↕", command=lambda _c=col: self.ordenar_por(_c, False))
++        
++        self.tree.column("Rank", width=40, anchor="center")
++        self.tree.column("Cod", width=80, anchor="center")
++        self.tree.column("Nome", width=280)
++        self.tree.column("Ultima_Compra", width=110, anchor="center")
++        self.tree.column("Dias", width=100, anchor="center")
++        self.tree.column("Media", width=130, anchor="e")
++        self.tree.column("Contatos", width=110, anchor="center")
++
++        # Rodapé de Totais
++        self.lbl_rodape_total = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
++        self.lbl_rodape_total.pack(side="left", padx=15)
+ 
+         # Clique para ver Telefones
+         self.tree.bind("<ButtonRelease-1>", self.on_click_item)
+@@ -1727,6 +1937,26 @@ class ClientesPararamWindow(BaseWindow):
+ 
+         self.after(200, self.carregar_dados)
+ 
++    def get_sql_summary(self):
++        dias = self.combo_dias.get().replace(" dias", "")
++        emp = self.config_db.get("empresa", "01")
++        return (
++            "TABELAS:\n"
++            "- CRMOV2 c2 (Movimento)\n"
++            "- CRCLI cli (Clientes)\n\n"
++            "CAMPOS PARA CÁLCULO/FILTRO:\n"
++            "- c2.CRMov2CodC = cli.crclicod (Vínculo Cliente)\n"
++            "- c2.CRMovDta: Data Base p/ DATEDIFF e MAX()\n"
++            "- c2.CRMov2VlrO: Cálculo de Média de Compras\n"
++            "- cli.CRCliTel1 a Tel4: Telefones para Contato\n"
++            "- c2.CRMov2Flag: Situação da Venda (A, F)\n\n"
++            "FILTRO ATUAL (WHERE/HAVING):\n"
++            f"  c2.CMEmpCod = '{emp}'\n"
++            "  AND c2.CRMov2Flag IN ('A', 'F')\n"
++            "  AND c2.CRMov2CodC <> 1\n"
++            f"  HAVING MAX(c2.CRMovDta) <= DATEADD(day, -{dias}, GETDATE())"
++        )
++
+     def on_click_item(self, event):
+         item_id = self.tree.identify_row(event.y)
+         col_id = self.tree.identify_column(event.x)
+@@ -1779,21 +2009,48 @@ class ClientesPararamWindow(BaseWindow):
+         except Exception as e:
+             ctk.CTkLabel(cont_frame, text=f"Erro de Busca:\n{str(e)}", text_color="red", wraplength=300).pack(pady=20)
+ 
+-    def sort_column(self, col, reverse):
+-        l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+-        def try_convert(x):
+-            if col in ["Nome", "Contatos"]:
+-                return str(x[0]).casefold()
+-            try: return float(x[0].replace('R$ ', '').replace('.', '').replace(',', '.'))
+-            except: 
+-                try: return int(x[0].replace(' dias', ''))
+-                except: return str(x[0]).casefold()
++    def ordenar_por(self, col, reverse):
++        data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
++        
++        def clean_val(v, column):
++            if not v: return ""
++            s = str(v).strip()
++            
++            if column == "Nome":
++                try:
++                    import unidecode
++                    return unidecode.unidecode(s.upper())
++                except: return s.upper()
+ 
+-        l.sort(key=try_convert, reverse=reverse)
+-        for index, (val, k) in enumerate(l):
+-            self.tree.move(k, '', index)
++            if "R$" in s:
++                try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").strip())
++                except: return 0.0
++            
++            if " dias" in s:
++                try: return int(s.replace(" dias", ""))
++                except: return 0
++            
++            if s.isdigit(): return int(s)
++            
++            if "/" in s and len(s) == 10:
++                try:
++                    import datetime
++                    return datetime.datetime.strptime(s, "%d/%m/%Y")
++                except: pass
++
++            return s.upper()
++
++        data.sort(key=lambda t: clean_val(t[0], col), reverse=reverse)
++        for index, (val, k) in enumerate(data):
++            self.tree.move(k, "", index)
+             self.tree.set(k, "Rank", index + 1)
+-        self.tree.heading(col, command=lambda: self.sort_column(col, not reverse))
++        
++        for c in self.tree["columns"]:
++            if c == col:
++                seta = " ▼" if reverse else " ▲"
++                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
++            else:
++                self.tree.heading(c, text=self.headers_dict[c] + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
+ 
+     def filtrar_grid(self, event=None):
+         busca = self.entry_busca.get().strip().upper()
+@@ -1802,10 +2059,13 @@ class ClientesPararamWindow(BaseWindow):
+ 
+         self.emp_fil_cache.clear()
+         idx_count = 1
++        total_clientes = 0
++
+         for r_item in self.rows_cache:
+             nome = str(r_item[1]).strip().upper()
+             if busca and busca not in nome: continue
+ 
++            total_clientes += 1
+             cod_c = str(int(r_item[0])) if r_item[0] is not None else "0"
+             dta_compra = r_item[2].strftime('%d/%m/%Y') if r_item[2] else "S/ Data"
+             dias = int(r_item[3]) if r_item[3] is not None else 0
+@@ -1816,13 +2076,14 @@ class ClientesPararamWindow(BaseWindow):
+             
+             node_id = self.tree.insert("", "end", values=(idx_count, cod_c, r_item[1].strip(), dta_compra, f"{dias} dias", v_f, "📞 Ver"), tags=(tag,))
+             
+-            # Cache de emp, fil associado ao node_id exato (Incluído contato e tels)
+             tels = [r_item[7], r_item[8], r_item[9], r_item[10]]
+             tels_str = " / ".join([str(t).strip() for t in tels if t and str(t).strip()])
+             contato = str(r_item[11]).strip() if r_item[11] else ""
+ 
+-            self.emp_fil_cache[node_id] = (r_item[5], r_item[6], tels_str, contato) # Salva dados de contato
++            self.emp_fil_cache[node_id] = (r_item[5], r_item[6], tels_str, contato)
+             idx_count += 1
++        
++        self.lbl_rodape_total.configure(text=f"👥 TOTAL DE CLIENTES LISTADOS: {total_clientes}")
+ 
+     def carregar_dados(self):
+         try:
+@@ -1831,6 +2092,7 @@ class ClientesPararamWindow(BaseWindow):
+             conn = pyodbc.connect(conn_str); cursor = conn.cursor()
+ 
+             dias_inativo = int(self.combo_dias.get().replace(" dias", ""))
++            emp_val = self.config_db.get("empresa", "01")
+ 
+             query = f"""
+                 SELECT 
+@@ -1841,12 +2103,12 @@ class ClientesPararamWindow(BaseWindow):
+                     MAX(cli.CRCliTel1) as Tel1, MAX(cli.CRCliTel2) as Tel2, MAX(cli.CRCliTel3) as Tel3, MAX(cli.CRCliTel4) as Tel4, MAX(cli.CRCliCon) as Contato
+                 FROM crmov2 c2
+                 LEFT JOIN crcli cli ON c2.cmempcod = cli.cmempcod AND c2.CRMov2CodC = cli.crclicod
+-                WHERE c2.CRMov2Flag IN ('A', 'F') AND c2.CRMov2CodC NOT IN (1)
++                WHERE c2.CRMov2Flag IN ('A', 'F') AND c2.CRMov2CodC NOT IN (1) AND c2.CMEmpCod = ?
+                 GROUP BY c2.CRMov2CodC, c2.CRMov2DesC
+                 HAVING MAX(c2.CRMovDta) <= DATEADD(day, -{dias_inativo}, GETDATE())
+                 ORDER BY MediaAno DESC
+             """
+-            cursor.execute(query)
++            cursor.execute(query, (emp_val,))
+             self.rows_cache = cursor.fetchall(); conn.close()
+             self.filtrar_grid()
+         except Exception as e:
+@@ -2024,11 +2286,35 @@ class SugestaoCompraWindow(BaseWindow):
+         self.after(100, self.carregar_combos_filtros)
+         self.after(300, self.carregar_dados)
+ 
++    def get_sql_summary(self):
++        emp = self.config_db.get("empresa", "01")
++        where_grp = f"p.cegrpcod IN ({','.join(self.grupos_selecionados.keys())})" if self.grupos_selecionados else "1=1"
++        where_sgr = f"p.cesgrcod IN ({','.join(self.subgrupos_selecionados.keys())})" if self.subgrupos_selecionados else "1=1"
++        return (
++            "TABELAS:\n"
++            "- CEPRO p (Produtos)\n"
++            "- CEPROF f (Estoque)\n"
++            "- CRMOV4 c4 (Itens Venda)\n"
++            "- CRMOV2 c2 (Cabeçalho Venda)\n\n"
++            "CAMPOS PARA MÉDIA/SALDO:\n"
++            "- p.ceprocod: Código do Produto\n"
++            "- f.ceprofqtda: Saldo Físico por Filial\n"
++            "- c4.CRMov4Qtd: Quantidade Vendida (Soma 90 dias)\n"
++            "- c2.CRMovDta: Filtro de Período Recente\n"
++            "- c2.CRMov2Flag: Validação de Venda Ativa\n\n"
++            "FILTRO ATUAL:\n"
++            f"- {where_grp}\n"
++            f"- {where_sgr}\n"
++            "- c2.CRMovDta >= DATEADD(day, -90, GETDATE())\n"
++            "- c2.CRMov2Flag IN ('A', 'F')"
++        )
++
+     def carregar_dados(self):
+         try:
+             import pyodbc
+             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+             conn = pyodbc.connect(conn_str); cursor = conn.cursor()
++            emp_val = self.config_db.get("empresa", "01")
+ 
+             where_grp = f"p.cegrpcod IN ({','.join(self.grupos_selecionados.keys())})" if self.grupos_selecionados else "1=1"
+             where_sgr = f"p.cesgrcod IN ({','.join(self.subgrupos_selecionados.keys())})" if self.subgrupos_selecionados else "1=1"
+@@ -2040,8 +2326,8 @@ class SugestaoCompraWindow(BaseWindow):
+                     ISNULL(SUM(f.ceprofqtda), 0) as Estoque, 
+                     ISNULL(SUM(c4.CRMov4Qtd), 0) as Vendas3M
+                 FROM cepro p
+-                LEFT JOIN ceprof f ON p.ceprocod = f.ceprocod
+-                LEFT JOIN crmov4 c4 ON p.ceprocod = c4.CEProCod
++                LEFT JOIN ceprof f ON p.ceprocod = f.ceprocod AND f.CMEmpCod = '{emp_val}'
++                LEFT JOIN crmov4 c4 ON p.ceprocod = c4.CEProCod AND c4.CMEmpCod = '{emp_val}'
+                 LEFT JOIN crmov2 c2 ON c4.CMEmpCod = c2.CMEmpCod AND c4.CMFilCod = c2.CMFilCod AND c4.CRMovDta = c2.CRMovDta AND c4.CRMovSeq = c2.CRMovSeq
+                     AND c2.CRMovDta >= DATEADD(day, -90, GETDATE()) AND c2.CRMov2Flag IN ('A', 'F')
+                 WHERE {where_grp} AND {where_sgr}
+@@ -2189,6 +2475,31 @@ class PosicaoContasReceberWindow(BaseWindow):
+  
+         self.after(200, self.carregar_anos)
+ 
++    def get_sql_summary(self):
++        ano = self.combo_ano.get()
++        mes = self.combo_mes.get()
++        emp = self.config_db.get("empresa", "01")
++        where = [f"c.CMEmpCod = '{emp}'", "c.CRMov2Flag IN ('A', 'F')", "c.CRMovDta IS NOT NULL", "YEAR(c.CRMovDta) != 9999"]
++        if ano != "Todos": where.append(f"YEAR(c.CRMovDta) = {int(ano)}")
++        if mes != "Todos": 
++            try: mes_idx = self.meses_ext.index(mes); where.append(f"MONTH(c.CRMovDta) = {mes_idx}")
++            except: pass
++        where_str = "\n  AND ".join(where)
++        return (
++            "TABELAS:\n"
++            "- CRMOV2 c (Movimento)\n"
++            "- CRCCR r (Cartão/Forma)\n\n"
++            "CAMPOS PARA ANÁLISE:\n"
++            "- c.crmov2sit: Situação da Venda (Agrupamento)\n"
++            "- r.CRCCrTip: Tipo de Cartão (D=Débito, C=Crédito)\n"
++            "- c.CRMov2VlrO: Valor Total da Venda (Agregado)\n"
++            "- c.CRMovDta: Data de Movimento (Filtro)\n"
++            "- c.CMEmpCod: Código da Empresa\n"
++            "- c.CRMov2Flag: Filtro de Pendência (A, F)\n\n"
++            "FILTRO ATUAL (WHERE):\n"
++            f"  {where_str}"
++        )
++
+     def alternar_visualizacao(self, valor):
+         if valor == "Tabela":
+             self.chart_frame.pack_forget()
+@@ -2202,12 +2513,13 @@ class PosicaoContasReceberWindow(BaseWindow):
+         database = self.config_db.get("banco")
+         username = self.config_db.get("usuario_bd")
+         password = self.config_db.get("senha_bd")
++        emp_val = self.config_db.get("empresa", "01")
+         
+         conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};"
+         try:
+             import pyodbc, pandas as pd
+             conn = pyodbc.connect(conn_str)
+-            df_anos = pd.read_sql("SELECT DISTINCT YEAR(CRMovDta) as Ano FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999", conn)
++            df_anos = pd.read_sql("SELECT DISTINCT YEAR(CRMovDta) as Ano FROM crmov2 WHERE CRMovDta IS NOT NULL AND YEAR(CRMovDta) != 9999 AND CMEmpCod = ?", conn, params=(emp_val,))
+             conn.close()
+             
+             anos = sorted(df_anos['Ano'].dropna().unique().tolist(), reverse=True)
+@@ -2225,8 +2537,9 @@ class PosicaoContasReceberWindow(BaseWindow):
+ 
+             ano = self.combo_ano.get()
+             mes = self.combo_mes.get()
++            emp_val = self.config_db.get("empresa", "01")
+ 
+-            where_clauses = ["c.CRMov2Flag IN ('A', 'F')", "c.CRMovDta IS NOT NULL", "YEAR(c.CRMovDta) != 9999"]
++            where_clauses = ["c.CRMov2Flag IN ('A', 'F')", "c.CRMovDta IS NOT NULL", "YEAR(c.CRMovDta) != 9999", f"c.CMEmpCod = '{emp_val}'"]
+             if ano != "Todos": where_clauses.append(f"YEAR(c.CRMovDta) = {int(ano)}")
+             if mes != "Todos": 
+                 try: mes_idx = self.meses_ext.index(mes); where_clauses.append(f"MONTH(c.CRMovDta) = {mes_idx}")
+@@ -2384,6 +2697,25 @@ class EstoqueParadoWindow(BaseWindow):
+         self.btn_exp_pdf = ctk.CTkButton(self.bottom_bar, text="📄 PDF", command=self.exportar_pdf, fg_color="#E53935", hover_color="#B71C1C", width=90)
+         self.btn_exp_pdf.pack(side="right", padx=5, pady=5)
+ 
++    def get_sql_summary(self):
++        dias = self.combo_dias.get().replace(" dias", "")
++        busca = self.entry_busca.get().strip().upper()
++        return (
++            "TABELAS:\n"
++            "- CEPRO p (Cadastro Produtos)\n"
++            "- CEPROF f (Estoque Filial)\n"
++            "- CRMOV4 m (Movimento de Itens)\n\n"
++            "CAMPOS PARA ANÁLISE:\n"
++            "- f.CEProFQtdA: Saldo de Estoque (Agregado)\n"
++            "- p.CEProPreCu: Valor de Custo Médio\n"
++            "- m.CRMovDta: Última Movimentação (Inatividade)\n"
++            "- p.CEProCod: Chave de Integração\n"
++            "- p.CEProDes: Busca por Descrição\n\n"
++            "FILTRO ATUAL (HAVING):\n"
++            "  SUM(f.CEProFQtdA) > 0\n"
++            f"  AND (MAX(m.CRMovDta) <= DATEADD(day, -{dias}, GETDATE()) OR MAX(m.CRMovDta) IS NULL)"
++        )
++
+     def sort_column(self, col, reverse):
+         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+         def try_convert(x):
+@@ -2447,6 +2779,7 @@ class EstoqueParadoWindow(BaseWindow):
+                 custo = float(r_item[3]) if r_item[3] else 0.0
+                 total = qtd * custo
+                 
++                
+                 total_parado_geral += total
+                 total_linhas += 1
+ 
+@@ -2500,6 +2833,26 @@ class AnaliseParcelasWindow(BaseWindow):
+ 
+         self.after(100, self.carregar_dados)
+ 
++    def get_sql_summary(self):
++        emp = self.config_db.get("empresa", "01")
++        return (
++            "TABELAS:\n"
++            "- CRMOV3 c3 (Parcelas)\n"
++            "- CRMOV2 c2 (Vendas)\n\n"
++            "CAMPOS PARA ANÁLISE:\n"
++            "- c3.CRMov3DtaV: Data de Vencimento\n"
++            "- c3.CRMov3VlAb: Valor Aberto (Soma Faixas)\n"
++            "- c3.CRMov3Flag: Parcela Ativa (A=Aberta)\n"
++            "- c2.CRMov2CodC: Código do Cliente\n"
++            "- c2.CRMov2Flag: Venda Ativa/Finalizada (A, F)\n\n"
++            "FILTRO ATUAL (WHERE):\n"
++            f"  c2.CMEmpCod = '{emp}'\n"
++            "  AND c3.CRMov3VlAb > 0\n"
++            "  AND c3.CRMov3Flag = 'A'\n"
++            "  AND c2.CRMov2Flag IN ('A','F')\n"
++            "  AND c2.CRMov2CodC <> 1"
++        )
++
+     def carregar_dados(self):
+         try:
+             import pyodbc
+@@ -2521,11 +2874,12 @@ class AnaliseParcelasWindow(BaseWindow):
+                                    AND c3.CMFilCod = c2.CMFilCod 
+                                    AND c3.CRMovDta = c2.CRMovDta 
+                                    AND c3.CRMovSeq = c2.CRMovSeq
+-                WHERE c3.CRMov3VlAb > 0 
++                WHERE c2.CMEmpCod = ? AND c2.CRMov2Flag IN ('A','F') AND c3.CRMov3VlAb > 0
+                   AND c3.CRMov3Flag = 'A'
++                  AND c2.CRMov2Flag IN ('A','F')
+                   AND c2.CRMov2CodC <> 1
+             """
+-            self.df_parcelas = pd.read_sql(query, conn)
++            self.df_parcelas = pd.read_sql(query, conn, params=(self.config_db.get("empresa", "01"),))
+             conn.close()
+ 
+             if self.df_parcelas.empty:
+@@ -2692,9 +3046,784 @@ class AnaliseParcelasWindow(BaseWindow):
+     def exportar_pdf(self): pass
+     def exportar_excel(self): pass
+ 
++    def exportar_excel(self): pass
++
++class CobrancaClienteWindow(BaseWindow):
++    def __init__(self, parent, config):
++        super().__init__(parent, "Cobrança por Cliente", "COBRANCA_CLIENTE")
++        self.config_db = config
++
++        # Barra de Filtros
++        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
++        self.filter_frame.pack(side="top", fill="x", padx=20, pady=5, anchor="w")
++
++        ctk.CTkLabel(self.filter_frame, text="Filtro Atraso:", font=("Arial", 14, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
++        self.combo_atraso = ctk.CTkComboBox(self.filter_frame, values=["Todos", "Até 30 dias", "Até 60 dias", "Até 90 dias", "Superior a 90 dias"], width=180, font=("Arial", 14), command=lambda _: self.carregar_dados())
++        self.combo_atraso.pack(side="left", padx=5); self.combo_atraso.set("Todos")
++
++        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Buscar cliente...", width=200, font=("Arial", 14))
++        self.entry_busca.pack(side="left", padx=10)
++        self.entry_busca.bind("<KeyRelease>", lambda _: self.filtrar_grid())
++
++        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Atualizar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
++        btn_processar.pack(side="left", padx=10)
++
++    def get_sql_summary(self):
++        emp = self.config_db.get("empresa", "01")
++        atraso = self.combo_atraso.get()
++        having = ""
++        if atraso == "Até 30 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
++        elif atraso == "Até 60 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
++        elif atraso == "Até 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
++        elif atraso == "Superior a 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
++
++        return (
++            "TABELAS:\n"
++            "- CRMOV3 c3 (Parcelas)\n"
++            "- CRMOV2 c2 (Cabeçalho Venda)\n\n"
++            "CAMPOS PARA ANÁLISE:\n"
++            "- c3.CRMov3DtaV: Data de Vencimento\n"
++            "- c3.CRMov3VlAb: Valor em Aberto Atual (Soma)\n"
++            "- c3.CRMov3Flag: Situação Parcela (A=Aberta)\n"
++            "- c2.CRMov2CodC: Código do Cliente (Agrupamento)\n"
++            "- c2.CRMov2DesC: Razão Social/Nome p/ Lista\n"
++            "- c2.CMEmpCod: Identificação da Empresa\n\n"
++            "FILTRO ATUAL (WHERE/HAVING):\n"
++            f"  c2.CMEmpCod = '{emp}'\n"
++            "  AND c3.CRMov3VlAb > 0\n"
++            "  AND c3.CRMov3Flag = 'A'\n"
++            "  AND c2.CRMov2Flag IN ('A','F')\n"
++            f"  {having}"
++        )
++
++        # Configurar Colunas do Grid
++        self.tree["columns"] = ("Cod", "Nome", "QtdAtraso", "ValorAtraso", "ValorAVencer", "ValorTotal", "DtaMaisAtrasada", "DiasAtraso")
++        
++        self.headers_dict = {
++            "Cod": "Cód.",
++            "Nome": "Nome do Cliente",
++            "QtdAtraso": "Qtd.",
++            "ValorAtraso": "Vlr. Atraso",
++            "ValorAVencer": "Vlr. a Vencer",
++            "ValorTotal": "Vlr. Total",
++            "DtaMaisAtrasada": "Dta. Atrasada",
++            "DiasAtraso": "Dias"
++        }
++
++        for col in self.tree["columns"]:
++            self.tree.heading(col, text=self.headers_dict[col] + " ↕", command=lambda c=col: self.ordenar_por(c, False))
++
++        self.tree.column("Cod", width=60, anchor="center")
++        self.tree.column("Nome", width=240)
++        self.tree.column("QtdAtraso", width=60, anchor="center")
++        self.tree.column("ValorAtraso", width=110, anchor="e")
++        self.tree.column("ValorAVencer", width=110, anchor="e")
++        self.tree.column("ValorTotal", width=110, anchor="e")
++        self.tree.column("DtaMaisAtrasada", width=100, anchor="center")
++        self.tree.column("DiasAtraso", width=60, anchor="center")
++
++        self.rows_cache = []
++        self.reverse_sort = False
++
++        # Rodapé de Totais
++        self.lbl_rodape_total = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
++        self.lbl_rodape_total.pack(side="left", padx=10)
++
++        self.after(100, self.carregar_dados)
++
++    def ordenar_por(self, col, reverse):
++        # 1. Obter os dados atuais do grid
++        data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
++        
++        # 2. Função de limpeza de valores para ordenação correta
++        def clean_val(v, column):
++            if not v: return ""
++            s = str(v).strip()
++            
++            # Se for a coluna Nome, faz ordenação de texto pura
++            if column == "Nome":
++                try:
++                    import unidecode
++                    return unidecode.unidecode(s.upper())
++                except: return s.upper()
++
++            # Moeda R$ 1.234,56
++            if "R$" in s:
++                try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").strip())
++                except: return 0.0
++            
++            # Números inteiros
++            if s.isdigit(): return int(s)
++            
++            # Datas DD/MM/AAAA
++            if "/" in s and len(s) == 10:
++                try:
++                    import datetime
++                    return datetime.datetime.strptime(s, "%d/%m/%Y")
++                except: pass
++
++            return s.upper()
++
++        # 3. Ordenar os dados
++        data.sort(key=lambda t: clean_val(t[0], col), reverse=reverse)
++        
++        # 4. Mover itens no grid
++        for index, (val, k) in enumerate(data):
++            self.tree.move(k, "", index)
++        
++        # 5. Atualizar TODOS os cabeçalhos para garantir que o comando não se perca e os ícones fiquem certos
++        for c in self.tree["columns"]:
++            if c == col:
++                seta = " ▼" if reverse else " ▲"
++                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
++            else:
++                self.tree.heading(c, text=self.headers_dict[c] + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
++
++    def carregar_dados(self):
++        try:
++            import pyodbc
++            import pandas as pd
++            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
++            conn = pyodbc.connect(conn_str)
++            
++            filtro_atraso = self.combo_atraso.get()
++            having_clause = ""
++            if filtro_atraso == "Até 30 dias": having_clause = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
++            elif filtro_atraso == "Até 60 dias": having_clause = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
++            elif filtro_atraso == "Até 90 dias": having_clause = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
++            elif filtro_atraso == "Superior a 90 dias": having_clause = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
++
++            query = f"""
++                SELECT 
++                    c2.CRMov2CodC as CodC, 
++                    MAX(c2.CRMov2DesC) as Nome, 
++                    COUNT(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN 1 END) as QtdAtraso,
++                    SUM(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN c3.CRMov3VlAb ELSE 0 END) as ValorAtraso,
++                    SUM(CASE WHEN c3.CRMov3DtaV >= CAST(GETDATE() AS DATE) THEN c3.CRMov3VlAb ELSE 0 END) as ValorAVencer,
++                    SUM(c3.CRMov3VlAb) as ValorTotal,
++                    MIN(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN c3.CRMov3DtaV END) as DtaAtraso,
++                    MAX(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN DATEDIFF(day, c3.CRMov3DtaV, GETDATE()) ELSE 0 END) as DiasAtraso
++                FROM crmov3 c3
++                INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod 
++                                   AND c3.CMFilCod = c2.CMFilCod 
++                                   AND c3.CRMovDta = c2.CRMovDta 
++                                   AND c3.CRMovSeq = c2.CRMovSeq
++                WHERE c2.CMEmpCod = ? AND c2.CRMov2Flag IN ('A','F') AND c3.CRMov3VlAb > 0
++                  AND c3.CRMov3Flag = 'A'
++                  AND c2.CRMov2Flag IN ('A','F')
++                  AND c2.CRMov2CodC <> 1
++                GROUP BY c2.CRMov2CodC
++                {having_clause}
++                ORDER BY ValorAtraso DESC
++            """
++            cursor = conn.cursor()
++            cursor.execute(query, (self.config_db.get("empresa", "01"),))
++            self.rows_cache = cursor.fetchall()
++            conn.close()
++            self.filtrar_grid()
++        except Exception as e:
++            from tkinter import messagebox
++            messagebox.showerror("Erro Carregar Cobrança", f"Erro no processamento:\n{str(e)}")
++
++    def filtrar_grid(self):
++        for item in self.tree.get_children(): self.tree.delete(item)
++        busca = self.entry_busca.get().strip().upper()
++
++        idx = 0
++        total_clientes = 0
++        soma_atraso = 0.0
++
++        for row in self.rows_cache:
++            cod_c = str(int(row[0]))
++            
++            if busca and (busca not in str(row[1]).strip().upper() and busca not in cod_c):
++                continue
++            
++            total_clientes += 1
++            qtd_atraso = int(row[2])
++            v_atraso = float(row[3])
++            soma_atraso += v_atraso
++            v_vencer = float(row[4])
++            v_total = float(row[5])
++            dta_atraso = row[6].strftime("%d/%m/%Y") if row[6] else "-"
++            dias_atraso = int(row[7])
++
++            tag = 'even' if idx % 2 == 0 else 'odd'
++            self.tree.insert("", "end", values=(
++                cod_c, 
++                row[1].strip(), 
++                qtd_atraso,
++                f"R$ {v_atraso:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
++                f"R$ {v_vencer:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
++                f"R$ {v_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
++                dta_atraso,
++                dias_atraso
++            ), tags=(tag,))
++            idx += 1
++
++        # Atualizar Rodapé
++        txt_total = f"👥 CLIENTES: {total_clientes}  |  💰 TOTAL EM ATRASO: R$ {soma_atraso:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++        self.lbl_rodape_total.configure(text=txt_total)
++
++    def exportar_pdf(self): pass
++    def exportar_excel(self): pass
++
++class ExcluirClientesInativosWindow(BaseWindow):
++    def __init__(self, parent, config):
++        super().__init__(parent, "Excluir Clientes Inativos (Regra Avançada)", "EXCLUIR_INATIVOS")
++        self.config_db = config
++
++        # Barra de Busca e Ações no Header
++        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
++        self.filter_frame.pack(side="left", fill="x", expand=True, padx=20, pady=(0, 5))
++
++        ctk.CTkLabel(self.filter_frame, text="Buscar:", font=("Arial", 16, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 5))
++        self.entry_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Filtrar por nome ou código...", width=250, font=("Arial", 15))
++        self.entry_busca.pack(side="left", padx=5)
++        self.entry_busca.bind("<KeyRelease>", self.filtrar_grid)
++
++        self.btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Processar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
++        self.btn_processar.pack(side="left", padx=10)
++
++        self.btn_help_exclusao = ctk.CTkButton(self.filter_frame, text="?", width=30, height=35, fg_color="#546E7A", hover_color="#455A64", font=("Arial", 14, "bold"), command=self.mostrar_ajuda_exclusao)
++        self.btn_help_exclusao.pack(side="right", padx=(5, 15))
++        ToolTip(self.btn_help_exclusao, "MOSTRAR SEQUÊNCIA DE EXCLUSÃO")
++
++        # Botão de Exclusão (Destaque em Vermelho)
++        self.btn_excluir = ctk.CTkButton(self.filter_frame, text="🗑️ EXCLUIR DEFINITIVAMENTE", command=self.confirmar_exclusao, fg_color="#D32F2F", hover_color="#B71C1C", width=220, font=("Arial", 13, "bold"))
++        self.btn_excluir.pack(side="right", padx=0)
++
++        # --- NOVO PADRAO: Usar configurar_grid ---
++        cols = ("Rank", "Cod", "Nome", "Det", "UltVenc", "VlAb", "MedMensal", "Status")
++        heads = ("🏆 #", "🔑 Cód", "👤 Cliente", "📋", "📅 UltVenc", "💰 Saldo", "📈 Média", "🔘")
++        wids = (50, 70, 250, 50, 110, 110, 110, 100)
++        aligns = ("center", "center", "w", "center", "center", "e", "e", "center")
++        self.configurar_grid(cols, heads, wids, aligns)
++
++        self.tree.bind("<Button-1>", self.on_click_tree)
++        self.tree.bind("<Double-1>", self.on_click_tree) 
++
++        self.after(200, self.carregar_dados)
++
++    def mostrar_ajuda_exclusao(self):
++        msg = (
++            "SEQUÊNCIA E CAMPOS DE EXCLUSÃO (CASCATA):\n\n"
++            "1. Títulos/Vínculos Secundários (crmov8 a crmov3):\n"
++            "   - Campos: CMEmpCod, CRMovDta ou CRMovSeq\n"
++            "   - Regra: Remove todos os registros vinculados às vendas do cliente.\n\n"
++            "2. Cabeçalho de Vendas (crmov2):\n"
++            "   - Campos: CRMov2CodC (ID Cliente), CMEmpCod\n"
++            "   - Regra: Remove o histórico de vendas/documentos.\n\n"
++            "3. Notas Fiscais (CENFC):\n"
++            "   - Campos: CRCliCod (ID Cliente), CMEmpCod\n"
++            "   - Regra: Remove vínculos de faturamento.\n\n"
++            "4. Cadastro Principal (crcli):\n"
++            "   - Campos: CRCliCod (ID Cliente), CMEmpCod\n"
++            "   - Regra: Exclusão definitiva do registro do cliente.\n\n"
++            "Toda a operação é executada dentro de uma transação SQL (Commit/Rollback)."
++        )
++        messagebox.showinfo("Detalhes da Exclusão", msg)
++
++    def ordenar_por(self, col, reverse):
++        data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
++        def clean_val(v, column):
++            if not v: return ""
++            s = str(v).strip()
++            if column == "Nome":
++                try: import unidecode; return unidecode.unidecode(s.upper())
++                except: return s.upper()
++            if column == "VlAb":
++                try: return float(s.replace("R$ ", "").replace(".", "").replace(",", "."))
++                except: return 0.0
++            if column == "Cod": return int(s) if s.isdigit() else 0
++            if column == "UltVenc":
++                try:
++                    from datetime import datetime
++                    return datetime.strptime(s, "%d/%m/%Y")
++                except: return s
++            if s.isdigit(): return int(s)
++            return s.upper()
++        data.sort(key=lambda t: clean_val(t[0], col), reverse=reverse)
++        for index, (val, k) in enumerate(data):
++            self.tree.move(k, "", index)
++            self.tree.set(k, "Rank", index + 1)
++        for c in self.tree["columns"]:
++            if c == col:
++                seta = " ▼" if reverse else " ▲"
++                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
++            else:
++                self.tree.heading(c, text=self.headers_dict[c] + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
++
++    def carregar_dados(self):
++        try:
++            import pyodbc
++            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
++            conn = pyodbc.connect(conn_str); cur = conn.cursor()
++            
++            emp_padrao = self.config_db.get("empresa", "01")
++
++            # 1. Buscar Candidatos (Base)
++            # Ajustado para considerar apenas parcelas em aberto no filtro de dívidas > 2 anos
++            query_base = """
++            SELECT 
++                c.CRCliCod, 
++                c.CRCliDes, 
++                MAX(c3.CRMov3DtaV) as UltimaDataGeral,
++                c.CRCliAti,
++                SUM(ISNULL(c3.CRMov3VlAb, 0)) as TotalAberto,
++                MAX(CASE WHEN ISNULL(c3.CRMov3VlAb, 0) > 0 THEN c3.CRMov3DtaV ELSE NULL END) as UltimaDataAberta
++            FROM crcli c
++            LEFT JOIN crmov2 c2 ON c.CRCliCod = c2.CRMov2CodC AND c.CMEmpCod = c2.CMEmpCod AND c2.CRMov2Flag IN ('A','F')
++            LEFT JOIN crmov3 c3 ON c2.CMEmpCod = c3.CMEmpCod AND c2.CMFilCod = c3.CMFilCod AND c2.CRMovDta = c3.CRMovDta AND c2.CRMovSeq = c3.CRMovSeq
++            WHERE c.CMEmpCod = ?
++            GROUP BY c.CRCliCod, c.CRCliDes, c.CRCliAti
++            HAVING 
++                c.CRCliAti = 'D'
++                OR (
++                    MAX(c3.CRMov3DtaV) < DATEADD(year, -1, GETDATE())
++                    AND SUM(ISNULL(c3.CRMov3VlAb, 0)) = 0
++                    AND MAX(c3.CRMov3DtaV) IS NOT NULL
++                )
++                OR (
++                    MAX(CASE WHEN ISNULL(c3.CRMov3VlAb, 0) > 0 THEN c3.CRMov3DtaV ELSE NULL END) < DATEADD(year, -2, GETDATE())
++                    AND SUM(ISNULL(c3.CRMov3VlAb, 0)) > 0
++                )
++            ORDER BY c.CRCliDes
++            """
++            cur.execute(query_base, (emp_padrao,))
++            self.rows_cache = cur.fetchall()
++
++            # 2. Buscar Histórico Mensal para Cálculo de Média
++            query_med = """
++            SELECT 
++                CRMov2CodC,
++                YEAR(CRMovDta) as Ano, 
++                MONTH(CRMovDta) as Mes, 
++                SUM(CRMov2VlrO) as TotalMes
++            FROM crmov2
++            WHERE CMEmpCod = ? AND CRMov2Flag IN ('A','F') AND CRMovDta >= DATEADD(month, -48, GETDATE())
++            GROUP BY CRMov2CodC, YEAR(CRMovDta), MONTH(CRMovDta)
++            """
++            cur.execute(query_med, (emp_padrao,))
++            history = cur.fetchall()
++
++            # 3. Buscar Soma Total do Sistema (Abertas e Quitadas) e Clientes Geral
++            query_totais = """
++                SELECT 
++                    SUM(ISNULL(c3.CRMov3VlAb, 0)) as SaldoAberto,
++                    SUM(ISNULL(c3.CRMov3VlrO, 0) - ISNULL(c3.CRMov3VlAb, 0)) as Pago,
++                    SUM(ISNULL(c3.CRMov3VlrO, 0)) as VolumeGeral
++                FROM crmov3 c3
++                INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod AND c3.CMFilCod = c2.CMFilCod AND c3.CRMovDta = c2.CRMovDta AND c3.CRMovSeq = c2.CRMovSeq
++                WHERE c2.CMEmpCod = ? AND c2.CRMov2Flag IN ('A','F')
++            """
++            cur.execute(query_totais, (emp_padrao,))
++            tot_ab, tot_pq, vol_geral = cur.fetchone()
++            tot_ab = tot_ab or 0.0; tot_pq = tot_pq or 0.0; vol_geral = vol_geral or 0.0
++
++            cur.execute("""
++                SELECT 
++                    COUNT(*), 
++                    SUM(CASE WHEN CRCliAti<>'D' THEN 1 ELSE 0 END),
++                    SUM(CASE WHEN CRCliAti='D' THEN 1 ELSE 0 END)
++                FROM crcli WHERE CMEmpCod=?
++            """, (emp_padrao,))
++            tot_cli_g, tot_cli_a, tot_cli_i = cur.fetchone()
++            
++            def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++            self.lbl_rodape_sistema.configure(text=f"🌍 SISTEMA | Abertas: {fmt(tot_ab)} | Quitadas: {fmt(tot_pq)}")
++            self.lbl_vlr_geral_parcelas.configure(text=f"Vol. Geral: {fmt(vol_geral)}")
++            self.lbl_cli_geral.configure(text=f"Geral: {tot_cli_g}")
++            self.lbl_cli_ativos.configure(text=f"Ativos: {tot_cli_a or 0}")
++            self.lbl_cli_inativos_db.configure(text=f"Inativos (DB): {tot_cli_i or 0}")
++
++            conn.close()
++
++            # Organizar histórico por cliente
++            hist_dict = {}
++            for h in history:
++                cod_c, ano, mes, vlr = h
++                if cod_c not in hist_dict: hist_dict[cod_c] = []
++                hist_dict[cod_c].append(float(vlr))
++
++            # Calcular médias com as regras de exclusão de outliers (muito abaixo da média)
++            self.medias_cache = {}
++            for cod_c, valores in hist_dict.items():
++                if not valores: 
++                    self.medias_cache[cod_c] = 0.0
++                    continue
++                
++                # Regra 1: Não contar meses sem movimento (já garantido pelo GROUP BY que não traz zeros)
++                # Regra 2: Calcular média inicial
++                v_filtered = [v for v in valores if v > 0]
++                if not v_filtered:
++                    self.medias_cache[cod_c] = 0.0
++                    continue
++                
++                avg_inicial = sum(v_filtered) / len(v_filtered)
++                
++                # Regra 3: Não contar meses em que seja muito abaixo da média (Outliers inferiores)
++                # Definimos "muito abaixo" como menos de 10% da média inicial (Solicitado pelo usuário)
++                threshold = avg_inicial * 0.10
++                v_final = [v for v in v_filtered if v >= threshold]
++                
++                if not v_final:
++                    self.medias_cache[cod_c] = avg_inicial # Fallback caso todos sejam filtrados (improvável)
++                else:
++                    self.medias_cache[cod_c] = sum(v_final) / len(v_final)
++
++            self.filtrar_grid()
++        except Exception as e:
++            from tkinter import messagebox
++            messagebox.showerror("Erro Carregar", f"Erro no processamento das médias e inativos:\n{str(e)}")
++
++    def filtrar_grid(self, event=None):
++        busca = self.entry_busca.get().strip().upper()
++        for item in self.tree.get_children(): self.tree.delete(item)
++        if not hasattr(self, 'rows_cache'): return
++
++        total = 0
++        soma_aberto = 0.0
++        def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++        
++        for idx, row in enumerate(self.rows_cache):
++            cod_c = str(int(row[0]))
++            nome_c = str(row[1]).strip().upper()
++            if busca and (busca not in nome_c and busca not in cod_c): continue
++
++            total += 1
++            
++            # Formatar Data e Valores
++            vl_aberto = float(row[4] or 0.0)
++            dta_exib = row[5] if vl_aberto > 0 and row[5] else row[2]
++            dta_str = dta_exib.strftime("%d/%m/%Y") if dta_exib else "N/A"
++            soma_aberto += vl_aberto
++            
++            vl_txt = fmt(vl_aberto)
++            media_v = self.medias_cache.get(row[0], 0.0)
++            med_txt = fmt(media_v)
++
++            # Status e Tags
++            tags = []
++            tags.append('even' if total % 2 == 0 else 'odd')
++            
++            if row[3] == 'D':
++                status_txt = "BLOQUEADO (D)"
++                tags.append('status_d')
++            elif vl_aberto > 0:
++                status_txt = "DÍVIDA > 2 ANOS"
++            else:
++                status_txt = "INATIVO > 1 ANO"
++            
++            self.tree.insert("", "end", values=(total, cod_c, nome_c, " 🔍 VER ", dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
++        
++        # Atualizar Resumo de Totais (Padrao Excel)
++        fmt = lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++        for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
++        self.tree_totais.insert("", "end", values=(f" TOTAIS ({total}):", "", "", "", "", fmt(soma_aberto), fmt(soma_med), ""))
++
++    def on_click_tree(self, event):
++        item_id = self.tree.identify_row(event.y)
++        if not item_id: return
++        
++        # Forçar seleção do item clicado para consistência
++        self.tree.selection_set(item_id)
++        self.tree.focus(item_id)
++
++        # Conforme solicitado: "clicar sobre a linha já abrir as parcelas"
++        # Isso cobre tanto o clique simples quanto o duplo clique
++        self.abrir_detalhes_parcelas(item_id)
++
++    def abrir_detalhes_parcelas(self, item_id=None):
++        if not item_id:
++            sel = self.tree.selection()
++            if not sel: return
++            item_id = sel[0]
++
++        item_vals = self.tree.item(item_id)['values']
++        cod_cliente = item_vals[1]
++        nome_cliente = item_vals[2]
++        self.hub.abrir_modulo_detalhes_inativos(cod_cliente, nome_cliente)
++
++    def confirmar_exclusao(self):
++        sel = self.tree.selection()
++        if not sel:
++            from tkinter import messagebox
++            messagebox.showwarning("Aviso", "Selecione um cliente para excluir.")
++            return
++        
++        vals = self.tree.item(sel[0])['values']
++        cod_c = vals[1]
++        nome_c = vals[2]
++        
++        # Diálogo customizado p/ confirmação de exclusão
++        class ConfirmDeleteDialog(ctk.CTkToplevel):
++            def __init__(self, master, cod, nome):
++                super().__init__(master)
++                self.title("🔴 CONFIRMAÇÃO DE EXCLUSÃO")
++                self.geometry("550x300")
++                self.configure(fg_color="#F8FAFC")
++                self.result = False
++                self.grab_set(); self.resizable(False, False); self.transient(master)
++                
++                # Centralizar
++                self.update_idletasks()
++                x = master.winfo_x() + (master.winfo_width() // 2) - 275
++                y = master.winfo_y() + (master.winfo_height() // 2) - 150
++                self.geometry(f"+{x}+{y}")
++                
++                ctk.CTkLabel(self, text="⚠️", font=("Arial", 60)).pack(pady=(20, 5))
++                ctk.CTkLabel(self, text="Deseja EXCLUIR DEFINITIVAMENTE o cliente:", font=("Arial", 14), text_color="#1E293B").pack(pady=5)
++                ctk.CTkLabel(self, text=f"({cod}) {str(nome).upper()}", font=("Arial", 20, "bold"), text_color="#E11D48", wraplength=500).pack(pady=10, fill="x", padx=20)
++                ctk.CTkLabel(self, text="Esta ação não poderá ser desfeita!", font=("Arial", 12, "italic"), text_color="gray").pack(pady=5)
++                
++                btn_frame = ctk.CTkFrame(self, fg_color="transparent")
++                btn_frame.pack(pady=20)
++                
++                ctk.CTkButton(btn_frame, text="✅ SIM, EXCLUIR", command=self.confirmar, fg_color="#D32F2F", hover_color="#B71C1C", width=160, height=40, font=("Arial", 13, "bold")).pack(side="left", padx=10)
++                ctk.CTkButton(btn_frame, text="✖ CANCELAR", command=self.destroy, fg_color="#DEE2E6", text_color="black", width=140, height=40, font=("Arial", 13, "bold")).pack(side="left", padx=10)
++                
++            def confirmar(self):
++                self.result = True
++                self.destroy()
++
++        dialog = ConfirmDeleteDialog(self, cod_c, nome_c)
++        self.wait_window(dialog)
++        
++        if dialog.result:
++            self.executar_exclusao(cod_c, nome_c)
++
++    def executar_exclusao(self, cod, nome):
++        # 1. Dialog customizado para senha (MAIOR)
++        class SenhaDialog(ctk.CTkToplevel):
++            def __init__(self, master):
++                super().__init__(master)
++                self.title("Autenticação Necessária")
++                self.geometry("450x250")
++                self.configure(fg_color="#F8FAFC")
++                self.result = None
++                self.grab_set() # Modal
++                self.resizable(False, False)
++                
++                # Centralizar
++                self.transient(master)
++                self.update_idletasks()
++                x = master.winfo_x() + (master.winfo_width() // 2) - 225
++                y = master.winfo_y() + (master.winfo_height() // 2) - 125
++                self.geometry(f"+{x}+{y}")
++
++                ctk.CTkLabel(self, text="⚠️ EXCLUSÃO DEFINITIVA", font=("Arial", 16, "bold"), text_color="#E11D48").pack(pady=(20, 10))
++                ctk.CTkLabel(self, text=f"Informe a senha para excluir:\n{nome}", font=("Arial", 13)).pack(pady=5)
++                
++                self.entry = ctk.CTkEntry(self, show="*", width=300, height=40, font=("Arial", 16), placeholder_text="Senha master...")
++                self.entry.pack(pady=10)
++                self.entry.focus_set()
++                self.entry.bind("<Return>", lambda e: self.confirmar())
++
++                btn_frame = ctk.CTkFrame(self, fg_color="transparent")
++                btn_frame.pack(pady=10)
++                
++                ctk.CTkButton(btn_frame, text="Confirmar", command=self.confirmar, fg_color="#1E293B", width=120, height=35).pack(side="left", padx=5)
++                ctk.CTkButton(btn_frame, text="Cancelar", command=self.destroy, fg_color="#DEE2E6", text_color="black", width=120, height=35).pack(side="left", padx=5)
++
++            def confirmar(self):
++                self.result = self.entry.get()
++                self.destroy()
++
++        if not getattr(self, "senha_autenticada", False):
++            dialog = SenhaDialog(self)
++            self.wait_window(dialog)
++            if dialog.result == "Mabelu@2011":
++                self.senha_autenticada = True
++            elif dialog.result is None:
++                return
++            else:
++                from tkinter import messagebox
++                messagebox.showerror("Erro", "Senha incorreta.")
++                return
++
++        try:
++            import pyodbc
++            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
++            conn = pyodbc.connect(conn_str); cur = conn.cursor()
++            emp = self.config_db.get("empresa", "01")
++            conn.autocommit = False
++            try:
++                # 2. Ordem de Exclusão Robusta para Evitar Conflitos de FK
++                # Verifica colunas existentes para construir os DELETEs sem erro de "coluna inválida"
++                for tab in ["crmov8", "crmov7", "crmov6", "crmov5", "crmov4", "crmov3"]:
++                    try:
++                        # Testar se a coluna CRMovDta existe na tabela
++                        cur.execute(f"SELECT TOP 0 CRMovDta FROM {tab}")
++                        # Se não deu erro, executa o DELETE por data e seq
++                        cur.execute(f"""
++                            DELETE FROM {tab} 
++                            WHERE CMEmpCod=? AND CRMovDta IN (SELECT CRMovDta FROM crmov2 WHERE CRMov2CodC=? AND CMEmpCod=?)
++                        """, (emp, cod, emp))
++                    except:
++                        # Se CRMovDta não existir, tenta por CRMovSeq se possível
++                        try:
++                            cur.execute(f"SELECT TOP 0 CRMovSeq FROM {tab}")
++                            cur.execute(f"""
++                                DELETE FROM {tab} 
++                                WHERE CMEmpCod=? AND CRMovSeq IN (SELECT CRMovSeq FROM crmov2 WHERE CRMov2CodC=? AND CMEmpCod=?)
++                            """, (emp, cod, emp))
++                        except:
++                            pass # Tabela não segue o padrão ou não existe
++
++                # Deletar cabeçalho
++                cur.execute("DELETE FROM crmov2 WHERE CRMov2CodC=? AND CMEmpCod=?", (cod, emp))
++                
++                # Deletar Vínculos de Notas Fiscais (Children of CENFC)
++                # CENFD (Duplicatas), CENFP (Produtos), CENFO1 (Observações), etc.
++                for child in ["CENFD", "CENFP", "CENFO1", "CENFR", "CENFV", "CENFM", "CENFK"]:
++                    try:
++                        cur.execute(f"""
++                            DELETE FROM {child} 
++                            WHERE CMEmpCod=? AND CENFCSeq IN (SELECT CENFCSeq FROM CENFC WHERE CRCliCod=? AND CMEmpCod=?)
++                        """, (emp, cod, emp))
++                    except:
++                        pass
++
++                # Deletar Notas Fiscais (CENFC)
++                cur.execute("DELETE FROM CENFC WHERE CRCliCod=? AND CMEmpCod=?", (cod, emp))
++
++                # Deletar cliente
++                cur.execute("DELETE FROM crcli WHERE CRCliCod=? AND CMEmpCod=?", (cod, emp))
++                
++                conn.commit()
++                class SuccessDeleteDialog(ctk.CTkToplevel):
++                    def __init__(self, master, nome):
++                        super().__init__(master)
++                        self.title("✅ EXCLUSÃO CONCLUÍDA")
++                        self.geometry("500x320")
++                        self.configure(fg_color="#FFFFFF")
++                        self.grab_set() 
++                        self.resizable(False, False)
++                        self.transient(master)
++                        
++                        # Centralizar
++                        self.update_idletasks()
++                        x = master.winfo_x() + (master.winfo_width() // 2) - 250
++                        y = master.winfo_y() + (master.winfo_height() // 2) - 160
++                        self.geometry(f"+{x}+{y}")
++
++                        try:
++                            img_path = os.path.join(os.path.dirname(__file__), "success_check.png")
++                            success_img_pil = Image.open(img_path)
++                            self.success_img = ctk.CTkImage(success_img_pil, size=(90, 90))
++                            ctk.CTkLabel(self, text="", image=self.success_img).pack(pady=(25, 10))
++                        except Exception:
++                            ctk.CTkLabel(self, text="✅", font=("Arial", 60)).pack(pady=(25, 10))
++
++                        ctk.CTkLabel(self, text="Operação Finalizada!", font=("Arial", 20, "bold"), text_color="#15803D").pack(pady=5)
++                        
++                        msg = f"O cliente {nome.upper()}\ne seus vínculos foram excluídos com sucesso."
++                        ctk.CTkLabel(self, text=msg, font=("Arial", 14), justify="center").pack(pady=(10, 20))
++                        
++                        ctk.CTkButton(self, text="OK", command=self.destroy, fg_color="#1E293B", hover_color="#334155", width=140, height=40, font=("Arial", 13, "bold")).pack(side="bottom", pady=25)
++
++                SuccessDeleteDialog(self, nome)
++                self.carregar_dados()
++            except Exception as e_sql:
++                conn.rollback(); raise e_sql
++            finally: conn.close()
++        except Exception as e:
++            from tkinter import messagebox
++            messagebox.showerror("Erro", f"Erro na exclusão: {e}")
++
+     def exportar_pdf(self): pass
+     def exportar_excel(self): pass
+ 
++class DetalhesParcelasInativosWindow(BaseWindow):
++    def __init__(self, parent, config, cod_cliente, nome_cliente):
++        super().__init__(parent, f"Histórico de Parcelas - {nome_cliente}", "DET_PARCELAS_INATIVOS")
++        self.config_db = config
++        self.cod_cliente = cod_cliente
++        self.nome_cliente = nome_cliente
++
++        # Ocultar botões de exportação padrão se não quiser agora, ou manter
++        # Usar novo padrao configurar_grid
++        self.configurar_grid(
++             columns=("DtaV", "VlNo", "VlAb", "DtaP"),
++             headings=("Vencimento", "Valor Parcela", "Saldo Aberto", "Data Pagamento"),
++             widths=(150, 180, 180, 150),
++             aligns=("center", "e", "e", "center")
++        )
++
++        self.after(100, self.carregar_dados)
++
++    def get_sql_summary(self):
++        emp = self.config_db.get("empresa", "01")
++        return (
++            "TABELAS:\n"
++            "- CRMOV3 c3 (Histórico Parcelas)\n"
++            "- CRMOV2 c2 (Documento Venda)\n\n"
++            "CAMPOS PARA ANÁLISE:\n"
++            "- c3.CRMov3DtaV: Data de Vencimento\n"
++            "- c3.CRMov3VlrO: Valor Original da Parcela\n"
++            "- c3.CRMov3VlAb: Saldo Pendente na Data\n"
++            "- c3.CRMov3DtaP: Data da Baixa Efetuada\n"
++            "- c2.CRMov2CodC: Código do Cliente Selecionado\n"
++            "- c2.CRMov2Flag: Flag Válida (Ativa/Finalizada)\n\n"
++            "FILTRO ATUAL (WHERE):\n"
++            f"- c2.CRMov2CodC = {self.cod_cliente}\n"
++            f"- c2.CMEmpCod = '{emp}'\n"
++            "- c2.CRMov2Flag IN ('A','F')"
++        )
++
++    def fechar_tela(self):
++        # Volta especificamente para a tela de inativos
++        self.hub.abrir_excluir_inativos()
++
++    def carregar_dados(self):
++        try:
++            import pyodbc
++            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
++            conn = pyodbc.connect(conn_str); cur = conn.cursor()
++            
++            sql = """
++            SELECT 
++                c3.CRMov3DtaV, 
++                c3.CRMov3VlrO, 
++                c3.CRMov3VlAb, 
++                c3.CRMov3DtaP
++            FROM crmov3 c3
++            INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod AND c3.CMFilCod = c2.CMFilCod AND c3.CRMovDta = c2.CRMovDta AND c3.CRMovSeq = c2.CRMovSeq
++            WHERE c2.CRMov2CodC = ? AND c2.CMEmpCod = ? AND c2.CRMov2Flag IN ('A','F')
++            ORDER BY c3.CRMov3DtaV DESC
++            """
++            cur.execute(sql, (self.cod_cliente, self.config_db.get("empresa","01")))
++            rows = cur.fetchall()
++            
++            total_nom = 0.0
++            total_aberto = 0.0
++            
++            def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
++            
++            for idx, r in enumerate(rows):
++                dv, v_nom, v_ab, dp = r
++                v_ab = float(v_ab or 0); v_nom = float(v_nom or 0)
++                total_nom += v_nom; total_aberto += v_ab
++                
++                dta_v_s = dv.strftime("%d/%m/%Y") if dv else ""
++                dta_p_s = dp.strftime("%d/%m/%Y") if dp else "---"
++                tag = 'even' if idx % 2 == 0 else 'odd'
++                
++                self.tree.insert("", "end", values=(dta_v_s, fmt(v_nom), fmt(v_ab), dta_p_s), tags=(tag,))
++
++            # Atualizar Treeview de Totais (Sincronização Perfeita)
++            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
++            self.tree_totais.insert("", "end", values=(f" TOTAIS ({len(rows)}):", fmt(total_nom), fmt(total_aberto), ""))
++
++            conn.close()
++
++        except Exception as e:
++            from tkinter import messagebox
++            messagebox.showerror("Erro SQL", f"Erro ao carregar detalhes:\n{e}")
++            self.lbl_detalhe_total.configure(text="🔴 Erro ao carregar.")
++
++
+ if __name__ == '__main__':
+     import sys, argparse
+     parser = argparse.ArgumentParser(description="Módulo de Análise e Atualização")
