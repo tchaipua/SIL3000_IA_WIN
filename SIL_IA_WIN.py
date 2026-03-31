@@ -1082,8 +1082,11 @@ class MainHub(ctk.CTk):
         self.btn_parcelas = ctk.CTkButton(self.col2_frame, text="💳 Análise das Parcelas", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_analise_parcelas, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_parcelas.pack(pady=8, padx=15)
 
-        self.btn_cobranca = ctk.CTkButton(self.col2_frame, text="📞 Cobrança por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=lambda: None, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_cobranca = ctk.CTkButton(self.col2_frame, text="📞 Cobrança por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_cobranca, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_cobranca.pack(pady=8, padx=15)
+
+        self.btn_excluir_inativos = ctk.CTkButton(self.col2_frame, text="🗑️ Excluir Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_excluir_inativos, fg_color="#C62828", hover_color="#B12020")
+        self.btn_excluir_inativos.pack(pady=8, padx=15)
 
         # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
         for col_idx in range(2, 5):
@@ -1298,8 +1301,61 @@ class BaseWindow(ctk.CTkFrame):
             from tkinter import messagebox
             messagebox.showerror("Erro", f"Erro ao processar comando: {e}")
 
+    def configuring_grid(self, columns, headings, widths, aligns):
+        """Método de compatibilidade (v1)"""
+        self.configurar_grid(columns, headings, widths, aligns)
+
+    def configurar_grid(self, columns, headings, widths, aligns):
+        """Método centralizado para configurar colunas, cabeçalhos e o rodapé de totais."""
+        self.tree["columns"] = columns
+        self.headers_dict = {col: head for col, head in zip(columns, headings)}
+        
+        for i, col in enumerate(columns):
+            self.tree.heading(col, text=headings[i] + " ↕", command=lambda c=col: self.ordenar_por(c, False))
+            self.tree.column(col, width=widths[i], anchor=aligns[i])
+            
+        # Criar Treeview de Totais (Sincronizado estilo Excel)
+        if hasattr(self, "grid_frame") and not hasattr(self, "tree_totais"):
+            style = ttk.Style()
+            # Estilo customizado para o rodapé (Fundo levemente diferente)
+            style_name = self.id_str + "_Tot.Treeview"
+            style.configure(style_name, background="#F8FAFC", foreground="black", rowheight=30, font=("Arial", 11, "bold"))
+            
+            self.tree_totais = ttk.Treeview(self.grid_frame, show="", height=1, columns=columns, style=style_name)
+            self.tree_totais.pack(fill="x", side="bottom")
+            for i, col in enumerate(columns):
+                self.tree_totais.column(col, width=widths[i], anchor=aligns[i])
+
+    def ordenar_por(self, col, reverse):
+        """Lógica de ordenação genérica para as janelas que utilizam BaseWindow."""
+        data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
+        def clean_val(v):
+            if not v: return ""
+            s = str(v).strip().upper()
+            if "R$" in s:
+                try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").strip())
+                except: return 0.0
+            if s.replace(".", "").isdigit():
+                try: return float(s)
+                except: return s
+            return s
+            
+        data.sort(key=lambda t: clean_val(t[0]), reverse=reverse)
+        for index, (val, k) in enumerate(data):
+            self.tree.move(k, "", index)
+        
+        # Inverter seta no cabeçalho
+        for c in self.tree["columns"]:
+            if c == col:
+                seta = " ▼" if reverse else " ▲"
+                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
+            else:
+                self.tree.heading(c, text=self.headers_dict.get(c, c) + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
+
+    def exportar_pdf(self): pass
+    def exportar_excel(self): pass
     def get_sql_summary(self):
-        return "Sql Data not ready"
+        return "Instrução SQL não definida para esta tela."
 
 
     def exportar_excel(self):
@@ -2828,34 +2884,6 @@ class CobrancaClienteWindow(BaseWindow):
         btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Atualizar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
         btn_processar.pack(side="left", padx=10)
 
-    def get_sql_summary(self):
-        emp = self.config_db.get("empresa", "01")
-        atraso = self.combo_atraso.get()
-        having = ""
-        if atraso == "Até 30 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
-        elif atraso == "Até 60 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
-        elif atraso == "Até 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
-        elif atraso == "Superior a 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
-
-        return (
-            "TABELAS:\n"
-            "- CRMOV3 c3 (Parcelas)\n"
-            "- CRMOV2 c2 (Cabeçalho Venda)\n\n"
-            "CAMPOS PARA ANÁLISE:\n"
-            "- c3.CRMov3DtaV: Data de Vencimento\n"
-            "- c3.CRMov3VlAb: Valor em Aberto Atual (Soma)\n"
-            "- c3.CRMov3Flag: Situação Parcela (A=Aberta)\n"
-            "- c2.CRMov2CodC: Código do Cliente (Agrupamento)\n"
-            "- c2.CRMov2DesC: Razão Social/Nome p/ Lista\n"
-            "- c2.CMEmpCod: Identificação da Empresa\n\n"
-            "FILTRO ATUAL (WHERE/HAVING):\n"
-            f"  c2.CMEmpCod = '{emp}'\n"
-            "  AND c3.CRMov3VlAb > 0\n"
-            "  AND c3.CRMov3Flag = 'A'\n"
-            "  AND c2.CRMov2Flag IN ('A','F')\n"
-            f"  {having}"
-        )
-
         # Configurar Colunas do Grid
         self.tree["columns"] = ("Cod", "Nome", "QtdAtraso", "ValorAtraso", "ValorAVencer", "ValorTotal", "DtaMaisAtrasada", "DiasAtraso")
         
@@ -2890,6 +2918,35 @@ class CobrancaClienteWindow(BaseWindow):
         self.lbl_rodape_total.pack(side="left", padx=10)
 
         self.after(100, self.carregar_dados)
+
+    def get_sql_summary(self):
+        emp = self.config_db.get("empresa", "01")
+        atraso = self.combo_atraso.get()
+        having = ""
+        if atraso == "Até 30 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
+        elif atraso == "Até 60 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
+        elif atraso == "Até 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
+        elif atraso == "Superior a 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
+
+        return (
+            "TABELAS:\n"
+            "- CRMOV3 c3 (Parcelas)\n"
+            "- CRMOV2 c2 (Cabeçalho Venda)\n\n"
+            "CAMPOS PARA ANÁLISE:\n"
+            "- c3.CRMov3DtaV: Data de Vencimento\n"
+            "- c3.CRMov3VlAb: Valor em Aberto Atual (Soma)\n"
+            "- c3.CRMov3Flag: Situação Parcela (A=Aberta)\n"
+            "- c2.CRMov2CodC: Código do Cliente (Agrupamento)\n"
+            "- c2.CRMov2DesC: Razão Social/Nome p/ Lista\n"
+            "- c2.CMEmpCod: Identificação da Empresa\n\n"
+            "FILTRO ATUAL (WHERE/HAVING):\n"
+            f"  c2.CMEmpCod = '{emp}'\n"
+            "  AND c3.CRMov3VlAb > 0\n"
+            "  AND c3.CRMov3Flag = 'A'\n"
+            "  AND c2.CRMov2Flag IN ('A','F')\n"
+            f"  {having}"
+        )
+
 
     def ordenar_por(self, col, reverse):
         # 1. Obter os dados atuais do grid
@@ -3023,7 +3080,8 @@ class CobrancaClienteWindow(BaseWindow):
 
         # Atualizar Rodapé
         txt_total = f"👥 CLIENTES: {total_clientes}  |  💰 TOTAL EM ATRASO: R$ {soma_atraso:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        self.lbl_rodape_total.configure(text=txt_total)
+        if hasattr(self, 'lbl_rodape_total') and self.lbl_rodape_total:
+             self.lbl_rodape_total.configure(text=txt_total)
 
     def exportar_pdf(self): pass
     def exportar_excel(self): pass
@@ -3062,6 +3120,20 @@ class ExcluirClientesInativosWindow(BaseWindow):
 
         self.tree.bind("<Button-1>", self.on_click_tree)
         self.tree.bind("<Double-1>", self.on_click_tree) 
+
+        # Labels de Totais e Status (Rodapé)
+        self.lbl_vlr_geral_parcelas = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
+        self.lbl_vlr_geral_parcelas.pack(side="left", padx=10)
+        
+        self.lbl_rodape_sistema = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
+        self.lbl_rodape_sistema.pack(side="left", padx=10)
+        
+        self.lbl_cli_geral = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 11, "bold"), text_color="gray")
+        self.lbl_cli_geral.pack(side="left", padx=5)
+        self.lbl_cli_ativos = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 11, "bold"), text_color="#43A047")
+        self.lbl_cli_ativos.pack(side="left", padx=5)
+        self.lbl_cli_inativos_db = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 11, "bold"), text_color="#D32F2F")
+        self.lbl_cli_inativos_db.pack(side="left", padx=5)
 
         self.after(200, self.carregar_dados)
 
@@ -3277,10 +3349,11 @@ class ExcluirClientesInativosWindow(BaseWindow):
             
             self.tree.insert("", "end", values=(total, cod_c, nome_c, " 🔍 VER ", dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
         
-        # Atualizar Resumo de Totais (Padrao Excel)
-        fmt = lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
-        self.tree_totais.insert("", "end", values=(f" TOTAIS ({total}):", "", "", "", "", fmt(soma_aberto), fmt(soma_med), ""))
+        # Atualizar Resumo de Totais
+        txt_resumo = f"👥 LISTADOS ({total}) | 💰 TOTAL EM ATRASO: {fmt(soma_aberto)}"
+        target_lbl = getattr(self, "lbl_rodape_total", None) or getattr(self, "lbl_rodape_sistema", None)
+        if target_lbl:
+             target_lbl.configure(text=txt_resumo)
 
     def on_click_tree(self, event):
         item_id = self.tree.identify_row(event.y)
@@ -3501,12 +3574,17 @@ class DetalhesParcelasInativosWindow(BaseWindow):
 
         # Ocultar botões de exportação padrão se não quiser agora, ou manter
         # Usar novo padrao configurar_grid
+        # Configurar Colunas do Grid
         self.configurar_grid(
              columns=("DtaV", "VlNo", "VlAb", "DtaP"),
              headings=("Vencimento", "Valor Parcela", "Saldo Aberto", "Data Pagamento"),
              widths=(150, 180, 180, 150),
              aligns=("center", "e", "e", "center")
         )
+
+        # Label de Totais Detalhes
+        self.lbl_detalhe_total = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 14, "bold"), text_color="#1565C0")
+        self.lbl_detalhe_total.pack(side="left", padx=20)
 
         self.after(100, self.carregar_dados)
 
@@ -3569,9 +3647,8 @@ class DetalhesParcelasInativosWindow(BaseWindow):
                 
                 self.tree.insert("", "end", values=(dta_v_s, fmt(v_nom), fmt(v_ab), dta_p_s), tags=(tag,))
 
-            # Atualizar Treeview de Totais (Sincronização Perfeita)
-            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
-            self.tree_totais.insert("", "end", values=(f" TOTAIS ({len(rows)}):", fmt(total_nom), fmt(total_aberto), ""))
+            # Atualizar Totais nos Labels
+            self.lbl_detalhe_total.configure(text=f"🧾 TOTAL GERAL ({len(rows)} Parcelas): {fmt(total_nom)}  |  💰 TOTAL ABERTO: {fmt(total_aberto)}")
 
             conn.close()
 

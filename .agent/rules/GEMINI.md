@@ -104,6 +104,7 @@ When auto-applying an agent, inform the user:
 5. **Autonomy**: Resolve tasks solo without asking for confirmation, unless the Socratic Gate strictly requires it for ambiguity.
 6. **Layout Protection**: NEVER change any layout or Approved Designs without explicit user permission. Preserve the existing visual structure.
 7. **Scope Control**: Fix ONLY the specific problem requested. No "proactive" unrelated improvements.
+8. **Preservação de SQL**: NUNCA alterar os métodos `get_sql_summary` ou qualquer string de instrução SQL vinculada ao botão 📋. Este conteúdo é definitivo e deve ser preservado em todas as telas.
 
 ### 🌐 Language Handling
 
