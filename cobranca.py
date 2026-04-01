@@ -15,8 +15,35 @@ class CobrancaClienteWindow(BaseWindow):
         self.entry_busca.pack(side="left", padx=10)
         self.entry_busca.bind("<KeyRelease>", lambda _: self.filtrar_grid())
 
-        btn_processar = ctk.CTkButton(self.filter_frame, text="⚙️ Atualizar", command=self.carregar_dados, fg_color="#1E88E5", hover_color="#1565C0", width=110, font=("Arial", 13, "bold"))
-        btn_processar.pack(side="left", padx=10)
+        # --- NOVO PADRAO: Usar configurar_grid p/ Alinhamento e Estilo ---
+        self.cols_map = {
+            "Cod": {"head": "🔑 Código", "align": "center", "width": 80},
+            "Nome": {"head": "👤 Nome do Cliente", "align": "w", "width": 300},
+            "QtdAtraso": {"head": "🔢 Parc.", "align": "center", "width": 90},
+            "ValorAtraso": {"head": "💰 Vlr. Atraso", "align": "e", "width": 140},
+            "ValorAVencer": {"head": "⏳ Vlr. a Vencer", "align": "e", "width": 140},
+            "ValorTotal": {"head": "📊 Vlr. Total", "align": "e", "width": 140},
+            "DtaMaisAtrasada": {"head": "📅 Dta. Atrasada", "align": "center", "width": 110},
+            "DiasAtraso": {"head": "🗓️ Dias", "align": "center", "width": 60}
+        }
+        
+        cols = tuple(self.cols_map.keys())
+        heads = tuple(m["head"] for m in self.cols_map.values())
+        wids = tuple(m["width"] for m in self.cols_map.values())
+        aligns = tuple(m["align"] for m in self.cols_map.values())
+        
+        self.configurar_grid(cols, heads, wids, aligns)
+        
+        # FORÇAR ALINHAMENTO MILIMÉTRICO (Sync Heading com Column)
+        for c, m in self.cols_map.items():
+            self.tree.heading(c, anchor=m["align"])
+            self.tree.column(c, anchor=m["align"])
+
+        self.tree.column("Nome", stretch=True)
+        self.rows_cache = []
+        self.reverse_sort = False
+
+        self.after(100, self.carregar_dados)
 
     def get_sql_summary(self):
         emp = self.config_db.get("empresa", "01")
@@ -46,41 +73,6 @@ class CobrancaClienteWindow(BaseWindow):
             f"  {having}"
         )
 
-        # Configurar Colunas do Grid
-        self.tree["columns"] = ("Cod", "Nome", "QtdAtraso", "ValorAtraso", "ValorAVencer", "ValorTotal", "DtaMaisAtrasada", "DiasAtraso")
-        
-        self.headers_dict = {
-            "Cod": "Cód.",
-            "Nome": "Nome do Cliente",
-            "QtdAtraso": "Qtd.",
-            "ValorAtraso": "Vlr. Atraso",
-            "ValorAVencer": "Vlr. a Vencer",
-            "ValorTotal": "Vlr. Total",
-            "DtaMaisAtrasada": "Dta. Atrasada",
-            "DiasAtraso": "Dias"
-        }
-
-        for col in self.tree["columns"]:
-            self.tree.heading(col, text=self.headers_dict[col] + " ↕", command=lambda c=col: self.ordenar_por(c, False))
-
-        self.tree.column("Cod", width=60, anchor="center")
-        self.tree.column("Nome", width=240)
-        self.tree.column("QtdAtraso", width=60, anchor="center")
-        self.tree.column("ValorAtraso", width=110, anchor="e")
-        self.tree.column("ValorAVencer", width=110, anchor="e")
-        self.tree.column("ValorTotal", width=110, anchor="e")
-        self.tree.column("DtaMaisAtrasada", width=100, anchor="center")
-        self.tree.column("DiasAtraso", width=60, anchor="center")
-
-        self.rows_cache = []
-        self.reverse_sort = False
-
-        # Rodapé de Totais
-        self.lbl_rodape_total = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
-        self.lbl_rodape_total.pack(side="left", padx=10)
-
-        self.after(100, self.carregar_dados)
-
     def ordenar_por(self, col, reverse):
         # 1. Obter os dados atuais do grid
         data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
@@ -89,45 +81,34 @@ class CobrancaClienteWindow(BaseWindow):
         def clean_val(v, column):
             if not v: return ""
             s = str(v).strip()
-            
-            # Se for a coluna Nome, faz ordenação de texto pura
             if column == "Nome":
                 try:
                     import unidecode
                     return unidecode.unidecode(s.upper())
                 except: return s.upper()
 
-            # Moeda R$ 1.234,56
             if "R$" in s:
                 try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").strip())
                 except: return 0.0
-            
-            # Números inteiros
             if s.isdigit(): return int(s)
-            
-            # Datas DD/MM/AAAA
             if "/" in s and len(s) == 10:
                 try:
                     import datetime
                     return datetime.datetime.strptime(s, "%d/%m/%Y")
                 except: pass
-
             return s.upper()
 
-        # 3. Ordenar os dados
         data.sort(key=lambda t: clean_val(t[0], col), reverse=reverse)
-        
-        # 4. Mover itens no grid
         for index, (val, k) in enumerate(data):
             self.tree.move(k, "", index)
         
-        # 5. Atualizar TODOS os cabeçalhos para garantir que o comando não se perca e os ícones fiquem certos
-        for c in self.tree["columns"]:
+        # 5. Atualizar TODOS os cabeçalhos PRESERVANDO O ANCHOR (Alinhamento)
+        for c, m in self.cols_map.items():
             if c == col:
                 seta = " ▼" if reverse else " ▲"
-                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
+                self.tree.heading(c, text=m["head"] + seta, anchor=m["align"], command=lambda _c=c: self.ordenar_por(_c, not reverse))
             else:
-                self.tree.heading(c, text=self.headers_dict[c] + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
+                self.tree.heading(c, text=m["head"] + " ↕", anchor=m["align"], command=lambda _c=c: self.ordenar_por(_c, False))
 
     def carregar_dados(self):
         try:
@@ -181,39 +162,49 @@ class CobrancaClienteWindow(BaseWindow):
 
         idx = 0
         total_clientes = 0
-        soma_atraso = 0.0
+        s_atraso = 0.0
+        s_vencer = 0.0
+        s_total = 0.0
 
         for row in self.rows_cache:
             cod_c = str(int(row[0]))
-            
-            if busca and (busca not in str(row[1]).strip().upper() and busca not in cod_c):
-                continue
+            if busca and (busca not in str(row[1]).strip().upper() and busca not in cod_c): continue
             
             total_clientes += 1
-            qtd_atraso = int(row[2])
-            v_atraso = float(row[3])
-            soma_atraso += v_atraso
-            v_vencer = float(row[4])
-            v_total = float(row[5])
-            dta_atraso = row[6].strftime("%d/%m/%Y") if row[6] else "-"
-            dias_atraso = int(row[7])
+            idx += 1
+            v_atr = float(row[3]); s_atraso += v_atr
+            v_ven = float(row[4]); s_vencer += v_ven
+            v_tot = float(row[5]); s_total += v_tot
 
+            dta_atr = row[6].strftime("%d/%m/%Y") if row[6] else "-"
+            
             tag = 'even' if idx % 2 == 0 else 'odd'
             self.tree.insert("", "end", values=(
-                cod_c, 
-                row[1].strip(), 
-                qtd_atraso,
-                f"R$ {v_atraso:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                f"R$ {v_vencer:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                f"R$ {v_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                dta_atraso,
-                dias_atraso
+                cod_c, row[1].strip(), int(row[2]),
+                f"R$ {v_atr:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"R$ {v_ven:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"R$ {v_tot:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                dta_atr, int(row[7])
             ), tags=(tag,))
-            idx += 1
 
-        # Atualizar Rodapé
-        txt_total = f"👥 CLIENTES: {total_clientes}  |  💰 TOTAL EM ATRASO: R$ {soma_atraso:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        self.lbl_rodape_total.configure(text=txt_total)
+        # --- SINCRONIZAR RODAPÉ (PADRÃO EXCEL) ---
+        fmt = lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+        
+        # Sincronizar larguras do grid principal
+        for col in self.tree["columns"]:
+            w = self.tree.column(col, "width")
+            self.tree_totais.column(col, width=w)
+
+        self.tree_totais.insert("", "end", values=(
+            f"Registros: {total_clientes}", 
+            "TOTAL EM ATRASO DO SISTEMA", 
+            "",
+            fmt(s_atraso), 
+            fmt(s_vencer), 
+            fmt(s_total), 
+            "", ""
+        ))
 
     def exportar_pdf(self): pass
     def exportar_excel(self): pass
