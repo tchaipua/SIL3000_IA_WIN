@@ -3114,9 +3114,24 @@ class ExcluirClientesInativosWindow(BaseWindow):
         # --- NOVO PADRAO: Usar configurar_grid ---
         cols = ("Rank", "Cod", "Nome", "Det", "UltVenc", "VlAb", "MedMensal", "Status")
         heads = ("🏆 #", "🔑 Cód", "👤 Cliente", "📋", "📅 UltVenc", "💰 Saldo", "📈 Média", "🔘")
-        wids = (50, 70, 250, 50, 110, 110, 110, 100)
+        # Larguras otimizadas e stretch
+        wids = (50, 90, 450, 50, 140, 140, 140, 180)
         aligns = ("center", "center", "w", "center", "center", "e", "e", "center")
         self.configurar_grid(cols, heads, wids, aligns)
+        
+        # 1. Ocultar o tree_totais da Base que está poluindo o rodapé (Solicitado: quadrado vermelho)
+        if hasattr(self, 'tree_totais'):
+            self.tree_totais.pack_forget()
+
+        # 2. Adicionar barra de rolagem vertical (Scrollbar)
+        self.scrollbar = ttk.Scrollbar(self.grid_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.pack(side="right", fill="y")
+
+        # 3. Aproveitar largura total removendo as margens brancas laterais
+        self.grid_frame.grid_configure(padx=0)
+        self.tree.column("Nome", stretch=True)
+        self.tree.column("Status", stretch=True)
 
         self.tree.bind("<Button-1>", self.on_click_tree)
         self.tree.bind("<Double-1>", self.on_click_tree) 
@@ -3185,6 +3200,24 @@ class ExcluirClientesInativosWindow(BaseWindow):
                 self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
             else:
                 self.tree.heading(c, text=self.headers_dict[c] + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
+
+    def get_sql_summary(self):
+        emp = self.config_db.get("empresa", "01")
+        return (
+            "TABELAS:\n"
+            "- CRCLI c (Cadastro Principal Clientes)\n"
+            "- CRMOV2 c2 (Vendas / Documentos / Cabeçalho)\n"
+            "- CRMOV3 c3 (Item Parcela / Vencimentos)\n\n"
+            "CAMPOS PARA ANÁLISE:\n"
+            "- c.CRCliAti: Identificador de Bloqueio ('D')\n"
+            "- c3.CRMov3DtaV: Datas de Movimentação/Vencimento\n"
+            "- c3.CRMov3VlAb: Status de Pagamento (Dívida)\n\n"
+            "FILTRO SELEÇÃO INATIVOS (WHERE/HAVING):\n"
+            f"  CMEmpCod = '{emp}'\n"
+            "  - CANDIDATO 1: Bloqueados no sistema (D)\n"
+            "  - CANDIDATO 2: Inativos s/ Dívida há > 1 Ano\n"
+            "  - CANDIDATO 3: Com Dívida em Aberto há > 2 Anos"
+        )
 
     def carregar_dados(self):
         try:
@@ -3347,7 +3380,10 @@ class ExcluirClientesInativosWindow(BaseWindow):
             else:
                 status_txt = "INATIVO > 1 ANO"
             
-            self.tree.insert("", "end", values=(total, cod_c, nome_c, " 🔍 VER ", dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
+            it = self.tree.insert("", "end", values=(total, cod_c, nome_c, " 🔍 VER ", dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
+            if total % 10 == 0:
+                 self.tree.see(it)
+                 self.update_idletasks()
         
         # Atualizar Resumo de Totais
         txt_resumo = f"👥 LISTADOS ({total}) | 💰 TOTAL EM ATRASO: {fmt(soma_aberto)}"
