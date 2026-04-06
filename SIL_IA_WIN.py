@@ -920,10 +920,48 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         x_vals = self.df_grouped[grouper_plot]
         y_vals = self.df_grouped['Valor']
         
-        bars = self.ax.bar(x_vals, y_vals, color='#1E88E5', edgecolor='#1565C0')
-        self.ax.set_title(f"{metrica} por {agrupamento_str}")
-        self.ax.set_ylabel(ylabel)
-        self.ax.set_xlabel(agrupamento_str)
+        # --- Lógica de Cores Dinâmicas (Degradê Vermelho/Verde) ---
+        colors = []
+        if not y_vals.empty:
+            max_v = y_vals.max()
+            min_v = y_vals.min()
+            avg_v = y_vals.mean()
+            
+            for v in y_vals:
+                if v > avg_v:
+                    # ACIMA DA MÉDIA: Degradê Vermelho (Média -> Máximo)
+                    # Da cor "Rosa Pastel" (#FFCDD2) para "Vermelho Intenso" (#B71C1C)
+                    ratio = (v - avg_v) / (max_v - avg_v) if max_v != avg_v else 1.0
+                    r = int(0xFF - (0xFF - 0xB7) * ratio)
+                    g = int(0xCD - (0xCD - 0x1C) * ratio)
+                    b = int(0xD2 - (0xD2 - 0x1C) * ratio)
+                elif v < avg_v:
+                    # ABAIXO DA MÉDIA: Degradê Verde (Mínimo -> Média)
+                    # Da cor "Verde Escuro" (#1B5E20) para "Verde Pastel" (#C8E6C9)
+                    ratio = (v - min_v) / (avg_v - min_v) if avg_v != min_v else 1.0
+                    r = int(0x1B + (0xC8 - 0x1B) * ratio)
+                    g = int(0x5E + (0xE6 - 0x5E) * ratio)
+                    b = int(0x20 + (0xC9 - 0x20) * ratio)
+                else:
+                    # EXATAMENTE NA MÉDIA: Cinza Azulado Neutro
+                    r, g, b = 0xCF, 0xD8, 0xDC
+                
+                colors.append(f'#{r:02x}{g:02x}{b:02x}')
+        else:
+            colors = '#1E88E5' # Fallback azul padrão
+            
+        bars = self.ax.bar(x_vals, y_vals, color=colors, edgecolor='#454545', linewidth=0.7)
+        self.ax.set_title(f"{metrica} por {agrupamento_str}", fontdict={'fontsize': 14, 'fontweight': 'bold', 'color': '#1E3A8A'})
+        self.ax.set_ylabel(ylabel, fontdict={'fontsize': 11, 'fontweight': 'bold'})
+        self.ax.set_xlabel(agrupamento_str, fontdict={'fontsize': 11, 'fontweight': 'bold'})
+        
+        # Grid horizontal para facilitar leitura
+        self.ax.yaxis.grid(True, linestyle='--', alpha=0.6, color='#E2E8F0')
+        self.ax.set_axisbelow(True)
+        
+        # Remove bordas desnecessárias
+        for spine in ['top', 'right']:
+            self.ax.spines[spine].set_visible(False)
         
         # Criação do Tooltip Interativo ao passar o mouse
         cursor = mplcursors.cursor(bars, hover=True)
@@ -934,15 +972,18 @@ class AnaliseVendasWindow(ctk.CTkFrame):
             label_x = self.df_grouped.iloc[idx][grouper_plot]
             qtd = self.df_grouped.iloc[idx]['Qtd']
             valor = self.df_grouped.iloc[idx]['ValorTotal']
-            texto = f"{label_x}\n----------------\nVendas: {qtd}\nTotal: R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            
+            # Formatação PT-BR
+            texto = f"{label_x}\n----------------\n📦 Vendas: {int(qtd)}\n💰 Total: R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
             sel.annotation.set_text(texto)
-            sel.annotation.get_bbox_patch().set(boxstyle="round,pad=0.5", fc="white", alpha=0.9, ec="#1E88E5")
+            sel.annotation.get_bbox_patch().set(boxstyle="round,pad=0.5", fc="white", alpha=0.95, ec="#1E88E5", lw=1.5)
+            sel.annotation.set_fontsize(10)
         
         # Formatação
         if len(x_vals) > 10:
-            self.ax.tick_params(axis='x', rotation=45)
+            self.ax.tick_params(axis='x', rotation=45, labelsize=9)
         else:
-            self.ax.tick_params(axis='x', rotation=0)
+            self.ax.tick_params(axis='x', rotation=0, labelsize=10)
             
         if "Valor" in metrica:
             self.ax.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')))
@@ -1034,9 +1075,46 @@ class MainHub(ctk.CTk):
         self.main_frame = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=0)
         self.main_frame.grid(row=0, column=1, sticky="nsew")
 
+        # --- CABEÇALHO GLOBAL DO HUB (NOVO) ---
+        self.top_header_hub = ctk.CTkFrame(self.main_frame, fg_color="#F1F5F9", height=50, corner_radius=0)
+        # Inicialmente oculto, aparece apenas no Módulo Posto
+        self.top_header_hub.pack_forget()
+        
+        self.posto_frame_hub = ctk.CTkFrame(self.top_header_hub, fg_color="transparent")
+        self.posto_frame_hub.pack(side="left", padx=20, pady=10)
+        
+        ctk.CTkLabel(self.posto_frame_hub, text="POSTO ATUAL:", font=("Arial", 15, "bold"), text_color="#1E293B").pack(side="left", padx=5)
+        self.combo_posto_hub = ctk.CTkComboBox(self.posto_frame_hub, width=320, font=("Arial", 15, "bold"), state="readonly", command=self.on_posto_change_hub)
+        self.combo_posto_hub.pack(side="left", padx=5)
+        
+        self.lbl_info_data_hub = ctk.CTkLabel(self.posto_frame_hub, text="", font=("Arial", 15, "bold"), text_color="#1565C0")
+        self.lbl_info_data_hub.pack(side="left", padx=20)
+        
+        self.lbl_info_per_hub = ctk.CTkLabel(self.posto_frame_hub, text="", font=("Arial", 15, "bold"), text_color="#1565C0")
+        self.lbl_info_per_hub.pack(side="left", padx=5)
+
+        self.postos_map_hub = {}
+        self.after(500, self.carregar_postos_hub)
+
         # Frame para os módulos (Canto Superior Esquerdo)
         self.modules_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        
+        # --- NOVO: Rodapé Global (Movido para cá) ---
+        self.footer_frame = ctk.CTkFrame(self, height=35, fg_color="#1E1E1E")
+        self.footer_frame.grid(row=1, column=1, sticky="ew")
+        
+        self.frame_id = ctk.CTkFrame(self.footer_frame, fg_color="transparent")
+        self.frame_id.pack(side="right", padx=15)
+        self.lbl_tela_id = ctk.CTkLabel(self.frame_id, text="Tela: PRINCIPAL", font=ctk.CTkFont(size=11, weight="bold"), text_color="white")
+        self.lbl_tela_id.pack(side="left")
+        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#333333", text_color="white", command=lambda: self.copiar_id("PRINCIPAL"))
+        self.btn_copy_id.pack(side="left", padx=5)
+        
+        self.lbl_footer = ctk.CTkLabel(self.footer_frame, text="", text_color="white", font=("Arial", 11))
+        self.lbl_footer.pack(side="left", padx=15, expand=True)
+        self.atualizar_rodape()
+        self.after(2000, self.testar_conexao_banco) # Aumentado delay inicial
         self.modules_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1) # 5 Colunas
         self.modules_frame.grid_rowconfigure(0, weight=1)
         
@@ -1089,30 +1167,89 @@ class MainHub(ctk.CTk):
         self.btn_excluir_inativos.pack(pady=8, padx=15)
 
         # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
-        for col_idx in range(2, 5):
+        for col_idx in range(2, 4):
              f = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#E2E8F0")
              f.grid(row=0, column=col_idx, sticky="nsew", padx=10, pady=10)
              ctk.CTkLabel(f, text=f"{col_idx + 1}º Coluna", font=("Arial", 15, "bold"), text_color="#94A3B8").pack(pady=(20, 15))
 
-        # Rodapé
-        self.footer_frame = ctk.CTkFrame(self, height=35, fg_color="#1E1E1E")
-        self.footer_frame.grid(row=1, column=1, sticky="ew")
+        # --- 5º COLUNA ( POSTO DE COMBUSTÍVEL ) ---
+        self.col5_frame = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col5_frame.grid(row=0, column=4, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col5_frame, text="5º Coluna", font=("Arial", 15, "bold"), text_color="#1E293B").pack(pady=(20, 15))
         
-        # ID da Tela no Canto Direito
-        self.frame_id = ctk.CTkFrame(self.footer_frame, fg_color="transparent")
-        self.frame_id.pack(side="right", padx=15)
-        
-        self.lbl_tela_id = ctk.CTkLabel(self.frame_id, text="Tela: PRINCIPAL", font=ctk.CTkFont(size=11, weight="bold"), text_color="white")
-        self.lbl_tela_id.pack(side="left")
-        
-        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#333333", text_color="white", command=lambda: self.copiar_id("PRINCIPAL"))
-        self.btn_copy_id.pack(side="left", padx=5)
-        ToolTip(self.btn_copy_id, "COPIAR NOME TELA")
+        self.btn_posto = ctk.CTkButton(self.col5_frame, text="⛽ POSTO DE COMBUSTÍVEL", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_posto, fg_color="#2E7D32", hover_color="#1B5E20")
+        self.btn_posto.pack(pady=8, padx=15)
+        ToolTip(self.btn_posto, "Módulo completo para Gestão de Postos")
 
-        self.lbl_footer = ctk.CTkLabel(self.footer_frame, text="", text_color="white", font=("Arial", 11))
-        self.lbl_footer.pack(side="left", padx=15, expand=True)
-        self.atualizar_rodape()
-        self.after(200, self.testar_conexao_banco)
+    def on_posto_change_hub(self, choice):
+        print(f"DEBUG: Mudou posto para -> {choice}")
+        cod = self.postos_map_hub.get(choice)
+        if cod is not None:
+            print(f"DEBUG: ID encontrado -> {cod}")
+            self.atualizar_info_posto_hub(cod)
+            # Ao mudar o posto, se houver um módulo aberto, tentar recarregar seus dados
+            if hasattr(self, 'modulo_atual') and hasattr(self.modulo_atual, 'carregar_dados'):
+                try: 
+                    print(f"DEBUG: Recarregando dados do módulo...")
+                    self.modulo_atual.carregar_dados()
+                except Exception as e: print(f"DEBUG Erro recarregar modulo: {e}")
+        else:
+            print(f"DEBUG: ID NÃO ENCONTRADO para {choice}. Mapa: {self.postos_map_hub}")
+
+    def get_selected_posto_id(self):
+        """Retorna o ID do posto atualmente selecionado no Hub."""
+        try:
+            choice = self.combo_posto_hub.get()
+            return self.postos_map_hub.get(choice, 1)
+        except: return 1
+
+    def carregar_postos_hub(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config['servidor']};DATABASE={self.config['banco']};UID={self.config['usuario_bd']};PWD={self.config['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            cur.execute("SELECT POEmpCod, POEmpDes FROM POEmp ORDER BY POEmpCod")
+            rows = cur.fetchall(); conn.close()
+            nomes = []; default_val = None
+            for cod, des in rows:
+                nome_formatado = f"{int(cod)} - {str(des).strip().upper()}"
+                nomes.append(nome_formatado)
+                self.postos_map_hub[nome_formatado] = int(cod)
+                if int(cod) == 1: default_val = nome_formatado
+            self.combo_posto_hub.configure(values=nomes)
+            if default_val:
+                self.combo_posto_hub.set(default_val)
+                self.on_posto_change_hub(default_val)
+            elif nomes:
+                self.combo_posto_hub.set(nomes[0])
+                self.on_posto_change_hub(nomes[0])
+        except Exception as e: print(f"Erro carregar postos hub: {e}")
+
+    def atualizar_info_posto_hub(self, cod):
+        """Atualiza a Data e Período no cabeçalho lendo da tabela POEmp."""
+        try:
+            # Feedback Visual Imediato
+            self.lbl_info_data_hub.configure(text="📅 DATA: Carregando...")
+            self.lbl_info_per_hub.configure(text="🕒 PER: ...")
+            self.update_idletasks()
+
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config['servidor']};DATABASE={self.config['banco']};UID={self.config['usuario_bd']};PWD={self.config['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            cur.execute("SELECT POEmpDtaUs, POEmpPer FROM POEmp WHERE POEmpCod = ?", cod)
+            row = cur.fetchone(); conn.close()
+            if row:
+                dta, per = row
+                dta_str = dta.strftime("%d/%m/%Y") if hasattr(dta, 'strftime') else str(dta)
+                self.lbl_info_data_hub.configure(text=f"📅 DATA ATUAL DA CONTABILIZAÇÃO: {dta_str}")
+                self.lbl_info_per_hub.configure(text=f"🕒 PERÍODO ATUAL: {per}")
+                print(f"DEBUG: Hub Atualizado -> Data: {dta_str}, Per: {per}")
+            else:
+                print(f"DEBUG: Nenhum registro encontrado para POEmpCod={cod}")
+            self.update_idletasks() 
+        except Exception as e:
+            print(f"CRITICAL ERROR carregar info hub: {e}")
+            self.lbl_info_data_hub.configure(text="📅 Erro ao carregar")
 
     def confirmar_saida(self):
         """Exibe um diálogo premium para confirmação de saída do sistema."""
@@ -1215,6 +1352,7 @@ class MainHub(ctk.CTk):
         if hasattr(self, 'modulo_atual') and self.modulo_atual:
              self.modulo_atual.destroy()
              self.modulo_atual = None
+        self.top_header_hub.pack_forget() # <--- Garante que o cabeçalho suma ao voltar pro Hub
         self.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
         
         # Bugfix CustomTkinter: Força recalculo de geometria
@@ -1230,6 +1368,16 @@ class MainHub(ctk.CTk):
         self.modules_frame.pack_forget()
         self.modulo_atual = classe_modulo(self.main_frame, self.config)
         self.modulo_atual.hub = self
+        
+        # --- Lógica de Exibição do Cabeçalho de Posto ---
+        # Só aparece no ModuloPostoWindow ou em tabelas que marcaram 'is_posto_table'
+        is_posto = isinstance(self.modulo_atual, ModuloPostoWindow) or getattr(self.modulo_atual, 'is_posto_table', False)
+        if is_posto:
+             # Pack do cabeçalho primeiro para ficar no topo
+             self.top_header_hub.pack(side="top", fill="x")
+        else:
+             self.top_header_hub.pack_forget()
+
         self.modulo_atual.pack(fill="both", expand=True)
         
         # Bugfix CustomTkinter: Força recalculo ao abrir módulo
@@ -1242,6 +1390,7 @@ class MainHub(ctk.CTk):
     def abrir_analise_produto(self): self.abrir_modulo(AnaliseProdutoWindow)
     def abrir_analise(self): self.abrir_modulo(AnaliseVendasWindow)
     def abrir_cep(self): self.abrir_modulo(App)
+    def abrir_posto(self): self.abrir_modulo(ModuloPostoWindow)
 
     def abrir_resumo_cliente(self): self.abrir_modulo(ResumoClienteWindow)
     def abrir_clientes_pararam(self): self.abrir_modulo(ClientesPararamWindow)
@@ -1255,25 +1404,439 @@ class MainHub(ctk.CTk):
         if hasattr(self, "modulo_atual") and self.modulo_atual:
              self.modulo_atual.destroy()
         self.modules_frame.pack_forget()
+        self.top_header_hub.pack_forget() # Oculta cabeçalho de Posto
         self.modulo_atual = DetalhesParcelasInativosWindow(self.main_frame, self.config, cod, nome)
         self.modulo_atual.hub = self
         self.modulo_atual.pack(fill="both", expand=True)
 
-    def abrir_modulo_detalhes_cobranca(self, cod, nome):
-        if hasattr(self, "modulo_atual") and self.modulo_atual:
-             self.modulo_atual.destroy()
-        self.modules_frame.pack_forget()
-        self.modulo_atual = DetalhesParcelasCobrancaWindow(self.main_frame, self.config, cod, nome)
-        self.modulo_atual.hub = self
-        self.modulo_atual.pack(fill="both", expand=True)
+    def abrir_tabela_posto(self, key):
+        config_tabela = POSTO_TABLES_CONFIG.get(key)
+        if config_tabela:
+            # Custom load logic for the generic window
+            def instanciador(parent, config):
+                win = TabelaPostoWindow(parent, config, config_tabela)
+                win.is_posto_table = True
+                return win
+            self.abrir_modulo(instanciador)
 
     def abrir_modulo_detalhes_cobranca(self, cod, nome):
         if hasattr(self, "modulo_atual") and self.modulo_atual:
              self.modulo_atual.destroy()
         self.modules_frame.pack_forget()
+        self.top_header_hub.pack_forget() # Oculta cabeçalho de Posto
         self.modulo_atual = DetalhesParcelasCobrancaWindow(self.main_frame, self.config, cod, nome)
         self.modulo_atual.hub = self
         self.modulo_atual.pack(fill="both", expand=True)
+
+class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
+    def __init__(self, parent, config):
+        super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
+        self.config_db = config
+        self.hub = parent # Na hierarquia do abrir_modulo, master é main_frame, mas o hub é passado à parte
+        self.id_str = "CONCILIACAO_CONCENTRADOR_VENDAS"
+
+        # --- FRAME SUPERIOR (Filtros) ---
+        self.top_frame = ctk.CTkFrame(self, fg_color="#F1F5F9", corner_radius=0)
+        self.top_frame.pack(side="top", fill="x")
+        
+
+        # Título
+        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: Concentrador x Vendas", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
+        
+        # Filtros de Data
+        from datetime import datetime, date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+        
+        filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        filter_frame.pack(side="right", padx=20, pady=10)
+        
+        ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=30, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(filter_frame, text="Até:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_ate = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=30, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+        
+        self.btn_filtrar = ctk.CTkButton(filter_frame, text="🔎 Conciliar", width=120, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#0D47A1", hover_color="#1565C0", command=self.carregar_divergencias)
+        self.btn_filtrar.pack(side="left", padx=10)
+        
+        
+        # --- GRID (TREEVIEW) ---
+        self.grid_container = ctk.CTkFrame(self, fg_color="white")
+        self.grid_container.pack(fill="both", expand=True, padx=20, pady=(5, 0))
+        
+        style = ttk.Style()
+        style.theme_use("clam") # 'clam' permite estilizar background de headers melhor
+        style.configure("Conciliacao.Treeview", rowheight=35, font=("Arial", 11), background="#FFFFFF", fieldbackground="#FFFFFF", borderwidth=0)
+        style.configure("Conciliacao.Treeview.Heading", background="#0D47A1", foreground="#FFFFFF", font=("Arial", 12, "bold"), relief="flat")
+        style.map("Conciliacao.Treeview.Heading", background=[('active', '#1565C0')]) # Hover effect
+        
+        self.tree = ttk.Treeview(self.grid_container, style="Conciliacao.Treeview", columns=("data", "seq", "item", "pro", "des", "qtd", "vlr", "status"), show="headings")
+        self.tree.pack(fill="both", expand=True)
+        
+        headings = [
+            ("data", "📅 Data"), ("seq", "🔢 Sequência"), ("item", "📦 Item"), 
+            ("pro", "🏷️ Produto"), ("des", "📝 Descrição"), 
+            ("qtd", "📊 Quantidade"), ("vlr", "💰 Preço"), ("status", "📢 Divergência")
+        ]
+        for col, head in headings:
+            self.tree.heading(col, text=head)
+            w = 100
+            if col == "des": w = 250
+            elif col == "status": w = 350
+            self.tree.column(col, anchor="center" if col not in ["des", "status"] else "w", width=w)
+        
+        # Totalizador de Registros (Summary)
+        self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
+        self.summary_frame.pack(fill="x", padx=20)
+        self.lbl_total = ctk.CTkLabel(self.summary_frame, text="Total de Divergências: 0 registros", font=("Arial", 13, "bold"), text_color="#1E293B")
+        self.lbl_total.pack(side="right", padx=20)
+
+        # --- BARRA INFERIOR ---
+        self.bottom_bar = ctk.CTkFrame(self, height=30, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=5)
+        
+        self.btn_voltar = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
+                                       fg_color="transparent", border_width=2, border_color="black", text_color="black", 
+                                       hover_color="#E0E0E0", font=("Arial", 12, "bold"))
+        self.btn_voltar.pack(side="left")
+        
+        id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        id_frame.pack(side="right")
+        
+        ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
+        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
+                     command=self.copiar_id_tela).pack(side="left", padx=5)
+
+        # Chamar carga automática com um pequeno delay para garantir populução do campos
+        self.after(500, self.carregar_divergencias)
+
+    def voltar(self):
+        if hasattr(self, 'hub') and self.hub:
+            self.hub.abrir_posto()
+
+    def copiar_id_tela(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        messagebox.showinfo("Copiado", f"ID da tela copiado: {self.id_str}")
+
+    def abrir_calendario(self, entry_target):
+        # Implementação de um seletor de data dinâmico (Pop-up)
+        pop = ctk.CTkToplevel(self)
+        pop.title("📅 Selecionar Data")
+        pop.geometry("320x400")
+        pop.attributes("-topmost", True)
+        pop.grab_set()
+        
+        from datetime import datetime, date
+        import calendar
+        
+        # Estado do calendário
+        hoje = date.today()
+        cal_state = {"mes": hoje.month, "ano": hoje.year}
+        
+        main_f = ctk.CTkFrame(pop, fg_color="white")
+        main_f.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        header_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        header_f.pack(fill="x", pady=5)
+        
+        lbl_mes_ano = ctk.CTkLabel(header_f, text="", font=("Arial", 14, "bold"), text_color="#1E88E5")
+        
+        def update_view():
+            mes = cal_state["mes"]
+            ano = cal_state["ano"]
+            nome_mes = ["?", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][mes]
+            lbl_mes_ano.configure(text=f"{nome_mes} {ano}")
+            
+            for widget in grid_f.winfo_children():
+                if int(widget.grid_info()["row"]) > 0: widget.destroy()
+            
+            cal = calendar.monthcalendar(ano, mes)
+            for r, week in enumerate(cal):
+                for c, day in enumerate(week):
+                    if day != 0:
+                        btn = ctk.CTkButton(grid_f, text=str(day), width=35, height=35, fg_color="#F1F5F9", text_color="black", 
+                                           hover_color="#CBD5E1", command=lambda d=day: set_date(d))
+                        btn.grid(row=r+1, column=c, padx=2, pady=2)
+
+        def mudar_mes(inc):
+            cal_state["mes"] += inc
+            if cal_state["mes"] > 12: cal_state["mes"] = 1; cal_state["ano"] += 1
+            elif cal_state["mes"] < 1: cal_state["mes"] = 12; cal_state["ano"] -= 1
+            update_view()
+
+        ctk.CTkButton(header_f, text="◀", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(-1)).pack(side="left", padx=10)
+        lbl_mes_ano.pack(side="left", expand=True)
+        ctk.CTkButton(header_f, text="▶", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(1)).pack(side="right", padx=10)
+        
+        grid_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        grid_f.pack(fill="both", expand=True)
+        
+        dias_sem = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"]
+        for i, ds in enumerate(dias_sem):
+            ctk.CTkLabel(grid_f, text=ds, font=("Arial", 10, "bold"), text_color="gray").grid(row=0, column=i, pady=5)
+        
+        def set_date(dia):
+            date_str = f"{dia:02d}/{cal_state['mes']:02d}/{cal_state['ano']}"
+            entry_target.delete(0, "end")
+            entry_target.insert(0, date_str)
+            pop.destroy()
+
+        update_view()
+
+    def carregar_divergencias(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            for i in self.tree.get_children(): self.tree.delete(i)
+            
+            # Formatar datas com strip para evitar erros de espaço
+            try:
+                de_raw = self.ent_de.get().strip()
+                ate_raw = self.ent_ate.get().strip()
+                if not de_raw or not ate_raw: return # Evitar erro se ainda vazio
+                
+                de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+                ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            except Exception as ex:
+                print(f"DEBUG Erro Data: {ex} | DE: '{de_raw}' ATE: '{ate_raw}'")
+                messagebox.showerror("Erro de Data", f"Formato inválido! Use DD/MM/AAAA\n\nErro: {str(ex)}")
+                return
+            
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            # Recuperar Posto através do Hub principal
+            posto_id = 1
+            if hasattr(self, "hub") and self.hub:
+                posto_id = self.hub.get_selected_posto_id()
+            
+            # SQL DE BATIMENTO REFINADO - Com Filtro de Data Preciso
+            sql = f"""
+                SELECT 
+                    c2.CRMovDta, 
+                    c2.CRMovSeq, 
+                    c4.CRMov4Ite, 
+                    c4.CEProCod as ProCod,
+                    COALESCE(p.CEProDes, 'N/D') as ProDes,
+                    COALESCE(c4.CRMov4Qtd, 0) as Qtd,
+                    COALESCE(c4.CRMov4VlrA, 0) as Preco,
+                    (SELECT COUNT(*) FROM POCF1 s 
+                     WHERE s.POEmpCod = c2.CMEmpCod 
+                     AND s.POCF1DtaMo = c2.CRMovDta 
+                     AND s.POCF1SeqMo = c2.CRMovSeq 
+                     AND s.POCF1IteMo = c4.CRMov4Ite) as QtdVendas
+                FROM CRMov2 c2
+                JOIN CRMov4 c4 ON c2.CMEmpCod = c4.CMEmpCod AND c2.CRMovSeq = c4.CRMovSeq
+                LEFT JOIN CEPro p ON p.CEProCod = c4.CEProCod
+                WHERE c2.CMEmpCod = ? 
+                AND CAST(c2.CRMovDta AS DATE) BETWEEN ? AND ?
+                AND (
+                    NOT EXISTS (SELECT 1 FROM POCF1 s 
+                                WHERE s.POEmpCod = c2.CMEmpCod 
+                                AND s.POCF1DtaMo = c2.CRMovDta 
+                                AND s.POCF1SeqMo = c2.CRMovSeq 
+                                AND s.POCF1IteMo = c4.CRMov4Ite)
+                    OR 
+                    (SELECT COUNT(*) FROM POCF1 s 
+                     WHERE s.POEmpCod = c2.CMEmpCod 
+                     AND s.POCF1DtaMo = c2.CRMovDta 
+                     AND s.POCF1SeqMo = c2.CRMovSeq 
+                     AND s.POCF1IteMo = c4.CRMov4Ite) > 1
+                )
+                ORDER BY c2.CRMovDta DESC
+            """
+            # Executar passando os parâmetros formatados
+            # Overlay de Processamento Centralizado (Diretamente na tela, não PopUp)
+            self.overlay_prog = ctk.CTkFrame(self, fg_color="white", border_width=2, border_color="#1E88E5", corner_radius=15)
+            self.overlay_prog.place(relx=0.5, rely=0.5, anchor="center")
+            
+            ctk.CTkLabel(self.overlay_prog, text="🚀 AUDITORIA CONCENTRADOR X VENDAS", font=("Arial", 14, "bold"), text_color="#1E293B").pack(padx=30, pady=(20, 5))
+            
+            self.p_bar = ctk.CTkProgressBar(self.overlay_prog, width=300, height=12, corner_radius=10, fg_color="#E2E8F0", progress_color="#1E88E5")
+            self.p_bar.pack(padx=30, pady=10)
+            self.p_bar.set(0)
+            
+            self.lbl_prog_val = ctk.CTkLabel(self.overlay_prog, text="⏳ Iniciando conexão...", font=("Arial", 12), text_color="#1E88E5")
+            self.lbl_prog_val.pack(pady=(0, 20))
+            
+            self.update() # Força a pintura do overlay antes da query pesada
+            
+            cur.execute(sql, (posto_id, de, ate))
+            rows = cur.fetchall()
+            
+            total_regs = len(rows)
+            for i, row in enumerate(rows):
+                # row[0]:Dta, row[1]:Seq, row[2]:Ite, row[3]:CodPro, row[4]:Des, row[5]:Qtd, row[6]:Preco, row[7]:QtdVendas
+                status = "❌ NÃO LANÇADO (POCF1)" if row[7] == 0 else f"⚠️ REPLICADO {row[7]}X"
+                v_data = row[0].strftime("%d/%m/%Y") if hasattr(row[0], "strftime") else str(row[0])
+                
+                self.tree.insert("", "end", values=(
+                    v_data, row[1], row[2], row[3], row[4], 
+                    f"{row[5]:.2f}", f"R$ {row[6]:.2f}", status
+                ))
+                
+                # Atualizar progresso centralizado e Barra
+                if (i + 1) % 50 == 0 or (i + 1) == total_regs:
+                    self.lbl_prog_val.configure(text=f"⚙️ Processando: {i+1} de {total_regs}...")
+                    self.p_bar.set((i + 1) / total_regs)
+                    self.update()
+
+            conn.close()
+            self.overlay_prog.destroy()
+            
+            # Finalização no Rodapé
+            self.lbl_total.configure(text=f"📊 Total de Divergências: {total_regs} registros", text_color="#1E293B")
+            
+            # Zebra rows reforçado (Cores mais fortes)
+            for i, child in enumerate(self.tree.get_children()):
+                tag = "even" if i % 2 == 0 else "odd"
+                self.tree.item(child, tags=(tag,))
+            self.tree.tag_configure("even", background="#FFFFFF")
+            self.tree.tag_configure("odd", background="#E2E8F0")
+            
+        except Exception as e:
+            messagebox.showerror("Erro Conciliação", f"Falha ao cruzar dados:\n\n{str(e)}")
+
+class ModuloPostoWindow(ctk.CTkFrame):
+    def __init__(self, parent, config):
+        super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
+        self.config = config
+        self.id_str = "MODULO_POSTO"
+        
+        # O Módulo Posto agora utiliza o Cabeçalho Global do Hub Principal (MainHub)
+        # para seleção de Posto, Data e Período.
+
+        # para seleção de Posto, Data e Período.
+
+        # Grid de botões (Multi-Colunas)
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.content_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        
+        btn_width = 240
+        btn_height = 40
+        
+        # --- COLUNA 1: EQUIPAMENTOS ---
+        self.col1 = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col1.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col1, text="🏗️ Equipamentos", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
+        
+        btns_col1 = [
+            ("🏢 Cadastro Posto (POEmp)", "POEmp"),
+            ("📻 Bombas (POBom/POMBo)", "POBom"),
+            ("🔧 Intervenção Técnica (POBIT)", "POBIT"),
+            ("🛢️ Cadastro de Tanques (POTnq)", "POTnq"),
+            ("🔐 Cadastro de Lacres (POLac)", "POLac"),
+            ("🔗 Vínculo Bico/Bomba (POBxB)", "POBxB")
+        ]
+        for txt, key in btns_col1:
+            cmd = lambda k=key: self.hub.abrir_tabela_posto(k)
+            ctk.CTkButton(self.col1, text=txt, width=btn_width, height=btn_height, font=("Arial", 12, "bold"), command=cmd, fg_color="#1E88E5", hover_color="#1565C0").pack(pady=5, padx=15)
+
+        # --- NOVA SEÇÃO: CONSISTÊNCIAS ---
+        # Posicionada abaixo de Equipamentos (Linha 1, Coluna 0)
+        self.col_consistencias = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col_consistencias.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col_consistencias, text="🔍 Consistências", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
+        
+        # Botão: Concentrador x Vendas
+        ctk.CTkButton(self.col_consistencias, text="🎯 Concentrador x Vendas", width=btn_width, height=btn_height, font=("Arial", 12, "bold"), 
+                     command=lambda: self.hub.abrir_modulo(ConciliacaoConcentradorVendasWindow), 
+                     fg_color="#F59E0B", hover_color="#D97706").pack(pady=10, padx=15)
+
+        # --- COLUNA 2: MOVIMENTAÇÃO / LMC ---
+        self.col2 = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col2.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col2, text="📖 Movimento / LMC", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
+        
+        btns_col2 = [
+            ("⏱️ Velocímetros (POVel1)", "POVel1"),
+            ("📜 Hist. Velocímetros (POVel2)", "POVel2"),
+            ("📊 LMC 1: Venda p/ Bomba", "POLMC1"),
+            ("📈 LMC 2: Estoque/Entrada", "POLMC2"),
+            ("📉 LMC 3: Resumo p/ Prod", "POLMC3"),
+            ("📚 Livros do LMC (POLvr)", "POLvr")
+        ]
+        for txt, key in btns_col2:
+            cmd = lambda k=key: self.hub.abrir_tabela_posto(k)
+            ctk.CTkButton(self.col2, text=txt, width=btn_width, height=btn_height, font=("Arial", 12, "bold"), command=cmd, fg_color="#1E88E5", hover_color="#1565C0").pack(pady=5, padx=15)
+
+        # --- COLUNA 3: FINANCEIRO / CAIXA ---
+        self.col3 = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col3.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col3, text="💰 Financeiro / Caixa", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
+        
+        btns_col3 = [
+            ("⭐ Movimentos (POCF1)", "POCF1"),
+            ("👤 Caixa Frentista (POCF2)", "POCF2"),
+            ("📊 Totais Frentista (POCF3)", "POCF3"),
+            ("📑 Itens Frentista (POCF4)", "POCF4"),
+            ("🏦 Caixa Geral (POCxa1)", "POCxa1"),
+            ("📒 Detalhe Caixa (POCxa2)", "POCxa2"),
+            ("🎫 Cadastro de Vales (POVal)", "POVal")
+        ]
+        for txt, key in btns_col3:
+            cmd = lambda k=key: self.hub.abrir_tabela_posto(k)
+            ctk.CTkButton(self.col3, text=txt, width=btn_width, height=btn_height, font=("Arial", 12, "bold"), command=cmd, fg_color="#1E88E5", hover_color="#1565C0").pack(pady=5, padx=15)
+
+        # --- COLUNA 4: SUPRIMENTO / DIVERSOS ---
+        self.col4 = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col4.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col4, text="🏁 Suprimento / Env", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
+        
+        btns_col4 = [
+            ("🚚 Entrada NF (POENF)", "POENF"),
+            ("🤝 Fornecedores (POFor)", "POFor"),
+            ("🕒 Períodos Caixa (POPer)", "POPer"),
+            ("🔥 Tipos Combustível (POTCo)", "POTCo"),
+            ("📝 Total Compra/Venda (POTCV)", "POTCV")
+        ]
+        for txt, key in btns_col4:
+            cmd = lambda k=key: self.hub.abrir_tabela_posto(k)
+            ctk.CTkButton(self.col4, text=txt, width=btn_width, height=btn_height, font=("Arial", 12, "bold"), command=cmd, fg_color="#1E88E5", hover_color="#1565C0").pack(pady=5, padx=15)
+
+
+
+
+        # Rodapé com Fechar e Copiar
+        self.bottom_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=10)
+        
+        self.btn_voltar = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Módulo", width=140, height=35, command=self.fechar_tela, fg_color="transparent", border_width=2, border_color="black", text_color="black", hover_color="#E0E0E0", font=("Arial", 12, "bold"))
+        self.btn_voltar.pack(side="left")
+        
+        self.frame_id = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        self.frame_id.pack(side="right")
+        
+        ctk.CTkLabel(self.frame_id, text=f"Tela: {self.id_str}", font=("Arial", 11, "bold"), text_color="gray").pack(side="left")
+        
+        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=self.copiar_id)
+        self.btn_copy_id.pack(side="left", padx=5)
+        ToolTip(self.btn_copy_id, "COPIAR NOME TELA")
+
+    def copiar_id(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+        
+    def fechar_tela(self):
+        if hasattr(self, 'hub'):
+            self.hub.fechar_modulo_atual()
+        else:
+            self.destroy()
+
 
 
 def centralizar_tela(tela, w, h):
@@ -1364,9 +1927,15 @@ class BaseWindow(ctk.CTkFrame):
         ToolTip(btn_copy_id, "COPIAR NOME TELA")
 
     def fechar_tela(self):
-        self.pack_forget()
-        if hasattr(self, 'hub') and hasattr(self.hub, 'modules_frame'):
-            self.hub.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        if hasattr(self, 'hub'):
+            if getattr(self, 'is_posto_table', False):
+                self.hub.abrir_posto()
+                return
+            self.pack_forget()
+            if hasattr(self.hub, 'modules_frame'):
+                self.hub.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        else:
+            self.pack_forget()
         self.destroy()
     def acao_copiar_e_sql(self):
         try:
@@ -1390,7 +1959,7 @@ class BaseWindow(ctk.CTkFrame):
         self.headers_dict = {col: head for col, head in zip(columns, headings)}
         
         for i, col in enumerate(columns):
-            self.tree.heading(col, text=headings[i] + " ↕", command=lambda c=col: self.ordenar_por(c, False))
+            self.tree.heading(col, text=headings[i] + " ↕", anchor=aligns[i], command=lambda c=col: self.ordenar_por(c, False))
             self.tree.column(col, width=widths[i], anchor=aligns[i])
             
         # Criar Treeview de Totais (Novo Padrão Edge-to-Edge: Barra Azul Total)
@@ -1441,11 +2010,20 @@ class BaseWindow(ctk.CTkFrame):
         
         # Inverter seta no cabeçalho
         for c in self.tree["columns"]:
+            anc = self.tree.column(c, "anchor")
             if c == col:
                 seta = " ▼" if reverse else " ▲"
-                self.tree.heading(c, text=self.headers_dict[c] + seta, command=lambda _c=c: self.ordenar_por(_c, not reverse))
+                self.tree.heading(c, text=self.headers_dict[c] + seta, anchor=anc, command=lambda _c=c: self.ordenar_por(_c, not reverse))
             else:
-                self.tree.heading(c, text=self.headers_dict.get(c, c) + " ↕", command=lambda _c=c: self.ordenar_por(_c, False))
+                self.tree.heading(c, text=self.headers_dict.get(c, c) + " ↕", anchor=anc, command=lambda _c=c: self.ordenar_por(_c, False))
+        
+        self.re_zebrar()
+
+    def re_zebrar(self):
+        """Atualiza o zebrado (Padrão: even/odd) no Treeview."""
+        for i, item in enumerate(self.tree.get_children()):
+            tag = 'even' if i % 2 == 0 else 'odd'
+            self.tree.item(item, tags=(tag,))
 
     def exportar_pdf(self): pass
     def exportar_excel(self): pass
@@ -1503,6 +2081,447 @@ class BaseWindow(ctk.CTkFrame):
                   pdf.cell(190, 10, txt_rodape, 0, 1, 'R')
              pdf.ln(5); pdf.output(filepath); os.startfile(filepath)
         except Exception as e: messagebox.showerror("Erro PDF", str(e))
+
+
+POSTO_TABLES_CONFIG = {
+    "POEmp": {"titulo": "Cadastro de Postos", "id_tela": "CAD_POSTO", "tabela": "POEmp", "colunas": ["POEmpCod", "POEmpDes", "POEmpRazSo", "POEmpCGC", "PoEmpEnd", "POEmpI_E"], "cabecalhos": ["Empresa", "Descrição", "Razão Social", "CNPJ", "Endereço", "Ins. Estadual"], "widths": [80, 180, 220, 130, 200, 130], "aligns": ["center", "w", "w", "center", "w", "center"]},
+    "POBom": {"titulo": "Cadastro de Bombas", "id_tela": "CAD_BOMBAS", "tabela": "POBom", "colunas": ["POBomCod", "POBomDes", "POBomVlrUn", "POBomTnqCo"], "cabecalhos": ["Código", "Descrição", "Valor Unitário Atual", "N° do Tanque"], "widths": [80, 200, 150, 100], "aligns": ["center", "w", "e", "center"]},
+    "POBIT": {"titulo": "Intervenção Técnica", "id_tela": "CAD_BICOS", "tabela": "POBIT", "colunas": ["POBomCod", "POMBoCod", "POBomDes", "POBITNroIn", "POBITDta", "POBITMot", "POBITNom", "POBITCNPJ", "POBITCPF"], "cabecalhos": ["Código Bico", "Código Bomba", "Descrição Bomba", "N° da Intervenção Técnica", "Data da Intervenção Técnica", "Motivo da Intervenção Técnica", "Nome do Interventor", "CNPJ da Empresa de Intervenção", "CPF do Interventor"], "widths": [100, 100, 180, 180, 150, 250, 180, 160, 140], "aligns": ["center", "center", "w", "center", "center", "w", "w", "center", "center"]},
+    "POTnq": {"titulo": "Cadastro de Tanques", "id_tela": "CAD_TANQUES", "tabela": "POTnq", "colunas": ["POTnqCod", "POTnqDes", "POTnqDesLM", "POLvrCod", "POTCoDes", "POTnqCusUn", "POTnqQtd"], "cabecalhos": ["Tanque", "Descrição", "Desc. LMC", "Livro", "Tipo Combustível", "Custo Úl. Ent.", "Capacidade (Lts)"], "widths": [80, 180, 150, 80, 180, 150, 150], "aligns": ["center", "w", "w", "center", "w", "e", "e"]},
+    "POLac": {"titulo": "Cadastro de Lacres", "id_tela": "CAD_LACRES", "tabela": "POLac", "colunas": ["POEmpCod", "POMBoCod", "POLacNro", "POLacDta"], "cabecalhos": ["Posto", "Bomba", "Nro Lacre", "Data"], "widths": [80, 80, 150, 120], "aligns": ["center", "center", "center", "center"]},
+    "POBxB": {"titulo": "Vínculo Bico/Bomba", "id_tela": "VIN_BICO_BOMBA", "tabela": "POBxB", "colunas": ["POBomCod", "BicoDes", "POMBoCod", "BombaDes", "POBxBSts"], "cabecalhos": ["Cód. Bico", "Descrição Bico", "Cód. Bomba", "Descrição Bomba", "Status"], "widths": [100, 200, 100, 200, 80], "aligns": ["center", "w", "center", "w", "center"]},
+    "POVel1": {"titulo": "Velocímetros", "id_tela": "VELOCIMETROS", "tabela": "POVel1", "colunas": ["POEmpCod", "POBomCod", "POVel1Dta", "POVel1VlrI", "POVel1VlrF"], "cabecalhos": ["Posto", "Bomba", "Data", "Inicial", "Final"], "widths": [60, 60, 120, 120, 120], "aligns": ["center", "center", "center", "e", "e"]},
+    "POVel2": {"titulo": "Hist. Velocímetros", "id_tela": "HIST_VELOCIMETROS", "tabela": "POVel2", "colunas": ["POEmpCod", "POBomCod", "POVel2Dta", "POVel2Hor", "POVel2Vlr"], "cabecalhos": ["Posto", "Bomba", "Data", "Hora", "Leitura"], "widths": [60, 60, 100, 80, 120], "aligns": ["center", "center", "center", "center", "e"]},
+    "POLMC1": {"titulo": "LMC 1: Venda p/ Bomba", "id_tela": "LMC_VENDA_BOMBA", "tabela": "POLMC1", "colunas": ["POEmpCod", "POLMC1Dta", "POBomCod", "POLMC1Qtd"], "cabecalhos": ["Posto", "Data", "Bomba", "Quantidade"], "widths": [80, 120, 80, 120], "aligns": ["center", "center", "center", "e"]},
+    "POLMC2": {"titulo": "LMC 2: Estoque/Entrada", "id_tela": "LMC_ESTOQUE", "tabela": "POLMC2", "colunas": ["POTnqCod", "PODtaMov", "POLMC2EIn", "POLMC2E_S"], "cabecalhos": ["Tanque", "Data Mov", "Est. Inicial", "Entr/Saída"], "widths": [80, 120, 120, 120], "aligns": ["center", "center", "e", "e"]},
+    "POLMC3": {"titulo": "LMC 3: Resumo p/ Prod", "id_tela": "LMC_RESUMO", "tabela": "POLMC3", "colunas": ["POEmpCod", "POLMC3Dta", "POTCoCod", "POLMC3Vnd"], "cabecalhos": ["Posto", "Data", "Tipo", "Total Venda"], "widths": [80, 120, 80, 150], "aligns": ["center", "center", "center", "e"]},
+    "POLvr": {"titulo": "Livros do LMC", "id_tela": "LMC_LIVROS", "tabela": "POLvr", "colunas": ["POLvrCod", "POLvrDes"], "cabecalhos": ["Cód", "Descrição do Livro"], "widths": [80, 300], "aligns": ["center", "w"]},
+    "POCF1": {"titulo": "⭐ Movimentos do Posto", "id_tela": "MOV_POSTO", "tabela": "POCF1", "colunas": ["POCF1Tst", "POCF1Usu", "POCF1BomCo", "POCF1Qtd", "POCF1VlrMo", "POCF1Sts"], "cabecalhos": ["Data/Hora", "Frentista", "Bomba", "Qtde", "Valor", "Sts"], "widths": [160, 100, 70, 90, 100, 50], "aligns": ["center", "w", "center", "e", "e", "center"]},
+    "POCF2": {"titulo": "Caixa Frentista (Resumo)", "id_tela": "CX_FRENTISTA_RES", "tabela": "POCF2", "colunas": ["POCF2Usu", "POCF2Tst", "POCF2Sts", "POCF2VlrMo", "POCF2TSTFe"], "cabecalhos": ["Frentista", "Abertura", "Sts", "Total", "Fechamento"], "widths": [120, 160, 60, 120, 160], "aligns": ["w", "center", "center", "e", "center"]},
+    "POCF3": {"titulo": "Totais Frentista", "id_tela": "CX_FRENTISTA_TOT", "tabela": "POCF3", "colunas": ["POCF2Usu", "POCF3TipMo", "POCF3VlrFi"], "cabecalhos": ["Frentista", "Tipo Mov.", "Valor Total"], "widths": [120, 100, 120], "aligns": ["w", "center", "e"]},
+    "POCF4": {"titulo": "Itens do Caixa", "id_tela": "CX_FRENTISTA_ITENS", "tabela": "POCF4", "colunas": ["POCF4Tst", "POCF4Usu", "POCF4ProDe", "POCF4Qtd", "POCF4VlrMo"], "cabecalhos": ["Data/Hora", "Frentista", "Produto", "Qtde", "Valor"], "widths": [160, 100, 200, 90, 100], "aligns": ["center", "w", "w", "e", "e"]},
+    "POCxa1": {"titulo": "Caixa Geral do Posto", "id_tela": "CX_GERAL_POSTO", "tabela": "POCxa1", "colunas": ["POCxa1DCx", "POCxa1Sts", "POCxa1Vlr"], "cabecalhos": ["Data Caixa", "Status", "Valor Total"], "widths": [120, 80, 150], "aligns": ["center", "center", "e"]},
+    "POCxa2": {"titulo": "Detalhes Caixa Geral", "id_tela": "CX_GERAL_DET", "tabela": "POCxa2", "colunas": ["POCxa1DCx", "POCxa2Tip", "POCxa2Vlr"], "cabecalhos": ["Data Caixa", "Tipo", "Valor"], "widths": [120, 100, 150], "aligns": ["center", "center", "e"]},
+    "POVal": {"titulo": "Cadastro de Vales", "id_tela": "CAD_VALES", "tabela": "POVal", "colunas": ["POValCod", "POValDta", "POValUsu", "POValVlr"], "cabecalhos": ["Cód", "Data", "Frentista", "Valor Vale"], "widths": [80, 100, 120, 120], "aligns": ["center", "center", "w", "e"]},
+    "POENF": {"titulo": "Entrada de Notas", "id_tela": "ENTRADA_NF_POSTO", "tabela": "POENF", "colunas": ["PODtaMov", "POForCod", "POForNNF", "POENFVlrTo"], "cabecalhos": ["Data", "Fornecedor", "Série/Nro", "Valor Total"], "widths": [100, 120, 120, 120], "aligns": ["center", "center", "center", "e"]},
+    "POFor": {"titulo": "Fornecedores Posto", "id_tela": "FORNECEDORES_POSTO", "tabela": "POFor", "colunas": ["POForCod", "POForDes"], "cabecalhos": ["Cód", "Razão Social"], "widths": [80, 300], "aligns": ["center", "w"]},
+    "POPer": {"titulo": "Períodos de Caixa", "id_tela": "PERIODOS_CAIXA", "tabela": "POPer", "colunas": ["POEmpCod", "POPerCod", "POPerDes"], "cabecalhos": ["Posto", "Período", "Descrição"], "widths": [80, 80, 200], "aligns": ["center", "center", "w"]},
+    "POTCo": {"titulo": "Tipos Combustível", "id_tela": "TIPOS_COMBUSTIVEL", "tabela": "POTCo", "colunas": ["POTCoCod", "POTCoDes"], "cabecalhos": ["Cód", "Tipo de Combustível"], "widths": [80, 250], "aligns": ["center", "w"]},
+    "POTCV": {"titulo": "Total Compra/Venda", "id_tela": "TOT_COMPRA_VENDA", "tabela": "POTCV", "colunas": ["POEmpCod", "POTCVDta", "POTCVVnd", "POTCVCom"], "cabecalhos": ["Posto", "Data", "Vendas", "Compras"], "widths": [80, 120, 120, 120], "aligns": ["center", "center", "e", "e"]}
+}
+
+POSTO_FIELD_LABELS = {
+    "POEmpCod": "Empresa",
+    "POEmpDes": "Descrição Empresa",
+    "POEmpDtaUs": "Data Atual do Movimento",
+    "POEmpPer": "Período Atual",
+    "POEmpRazSo": "Razão Social",
+    "PoEmpEnd": "Endereço",
+    "POEmpCGC": "C.N.P.J.",
+    "POEmpI_E": "Inscrição Estadual",
+    "POEmpQtdPe": "Quantidade de Períodos",
+    "POMBoCod": "Bomba",
+    "POBomCod": "Bico",
+    "POBITNroIn": "N° da Intervenção Técnica",
+    "POBITDta": "Data da Intervenção Técnica",
+    "POBITMot": "Motivo da Intervenção Técnica",
+    "POBITNom": "Nome do Interventor",
+    "POBITCNPJ": "CNPJ da Empresa de Intervenção",
+    "POBITCPF": "CPF do Interventor",
+    "POTnqCod": "Tanque",
+    "POTnqDes": "Descrição",
+    "POTnqDesLM": "Descrição Tanque no LMC",
+    "POLvrCod": "Livro",
+    "POTnqTipCo": "Tipo de Combustível",
+    "POTnqCusUn": "Custo Unitário da Última Entrada da Nota",
+    "POTnqConSp": "Código do Tanque para Consolidar no Speed",
+    "POTnqQtd": "Quantidade de Litros que Cabe no Tanque"
+}
+
+class FormularioPostoWindow(ctk.CTkToplevel):
+    def __init__(self, parent, config_db, table_info, pk_value=None):
+        super().__init__(parent)
+        self.config_db = config_db
+        self.table_info = table_info
+        self.pk_value = pk_value # Valor da PK se for ALTERAR
+        
+        self.title(f"{'📝 Alterar' if pk_value else '✚ Incluir'} - {table_info['titulo']} (Todos os Campos)")
+        self.geometry("650x800")
+        self.grab_set() 
+        centralizar_tela(self, 650, 800)
+
+        self.main_frame = ctk.CTkFrame(self, fg_color="#F1F5F9", corner_radius=15)
+        self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Área de rolagem para suportar todos os campos da tabela
+        self.scroll_frame = ctk.CTkScrollableFrame(self.main_frame, fg_color="transparent")
+        self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=(10, 80))
+        
+        ctk.CTkLabel(self.scroll_frame, text=f"{'📝 EDITAR REGISTRO COMPLETO' if pk_value else '✚ NOVO REGISTRO COMPLETO'}", font=("Arial", 18, "bold"), text_color="#1E293B").pack(pady=20)
+        
+        self.fields = {}
+        self.all_columns = []
+        self.carregar_layout_dinamico()
+        
+        # Nome Exclusivo da Tela e Botão Copiar (Canto Inferior Direito)
+        self.id_manut = f"MANUT_{table_info['id_tela']}"
+        self.footer_form = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=30)
+        self.footer_form.place(relx=1.0, rely=1.0, x=-20, y=-10, anchor="se")
+        
+        ctk.CTkLabel(self.footer_form, text=f"ID: {self.id_manut}", font=("Arial", 10, "bold"), text_color="gray").pack(side="left", padx=5)
+        btn_copy = ctk.CTkButton(self.footer_form, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E2E8F0", text_color="#64748B", font=("Arial", 11, "bold"), command=self.copiar_id_form)
+        btn_copy.pack(side="left")
+
+        # Barra de Ações (Fixo no rodapé)
+        self.actions_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.actions_frame.place(relx=0.5, rely=0.90, anchor="center", relwidth=0.8)
+        
+        self.btn_cancel = ctk.CTkButton(self.actions_frame, text="✖ Fechar sem Salvar", font=("Arial", 14, "bold"), height=48, fg_color="#E53935", hover_color="#B71C1C", command=self.destroy)
+        self.btn_cancel.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        self.btn_save = ctk.CTkButton(self.actions_frame, text="💾 SALVAR", font=("Arial", 14, "bold"), height=48, fg_color="#2E7D32", hover_color="#1B5E20", command=self.salvar)
+        self.btn_save.pack(side="left", fill="x", expand=True)
+
+    def copiar_id_form(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.id_manut)
+        from tkinter import messagebox
+        messagebox.showinfo("Copiado", f"ID da tela copiado: {self.id_manut}")
+
+    def carregar_layout_dinamico(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            tabela = self.table_info['tabela']
+            posto_id = 1
+            if hasattr(self.master, 'hub'): posto_id = self.master.hub.get_selected_posto_id()
+            
+            # 1. Buscar todas as colunas da tabela no banco
+            cur.execute(f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tabela}' ORDER BY ORDINAL_POSITION")
+            self.all_columns = [row[0] for row in cur.fetchall()]
+            
+            # 2. Se for alteração, buscar os dados atuais de TODAS as colunas
+            full_data = {}
+            if self.pk_value:
+                # CASO ESPECIAL: POBIT (Chave Composta)
+                if tabela.upper() == "POBIT" and isinstance(self.pk_value, (list, tuple)):
+                    sql = f"SELECT * FROM {tabela} WHERE POEmpCod = ? AND POBomCod = ? AND POBITNroIn = ?"
+                    cur.execute(sql, self.pk_value)
+                # CASO ESPECIAL: POBXB (Chave Composta)
+                elif tabela.upper() == "POBXB" and isinstance(self.pk_value, (list, tuple)):
+                    sql = f"SELECT * FROM {tabela} WHERE POEmpCod = ? AND POMBoCod = ? AND POBomCod = ?"
+                    cur.execute(sql, self.pk_value)
+                elif isinstance(self.pk_value, (list, tuple)):
+                    # CASO GERAL CHAVE COMPOSTA (Ex: Empresa + ID)
+                    sql = f"SELECT * FROM {tabela} WHERE POEmpCod = ? AND {self.all_columns[0 if self.all_columns[0].upper() != 'POEMPCOD' else 1]} = ?"
+                    cur.execute(sql, self.pk_value)
+                else:
+                    # Caso Padrão (Chave Simples)
+                    sql = f"SELECT * FROM {tabela} WHERE {self.all_columns[0]} = ?"
+                    cur.execute(sql, self.pk_value)
+                
+                row = cur.fetchone()
+                if row:
+                    full_data = {col: val for col, val in zip(self.all_columns, row)}
+                else:
+                    print(f"DEBUG: Registro não encontrado na tabela {tabela} para PK {self.pk_value}")
+            
+            # 3. Gerar campos na UI
+            for i, col in enumerate(self.all_columns):
+                frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+                frame.pack(fill="x", padx=20, pady=4)
+                
+                lbl_color = "#1565C0"; lbl_font = ("Arial", 12, "bold")
+                exibir_nome = POSTO_FIELD_LABELS.get(col, col)
+                ctk.CTkLabel(frame, text=f"{exibir_nome}:", font=lbl_font, text_color=lbl_color, width=180, anchor="w").pack(side="left")
+                
+                # --- NOVO: Lógica de ComboBox para Campos Específicos (POBXB) ---
+                if tabela.upper() == "POBXB" and col.upper() in ["POMBOCOD", "POBOMCOD"]:
+                    options = []
+                    try:
+                        if col.upper() == "POMBOCOD": # Bomba
+                            cur.execute("SELECT POBomCod, POBomDes FROM POBom WHERE POEmpCod = ?", (posto_id,))
+                            options = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+                        else: # Bico
+                            # Para o Bico, buscamos do cadastro de bombas (POBom) também, assumindo ser a mestre de equipamentos
+                            cur.execute("SELECT POBomCod, POBomDes FROM POBom WHERE POEmpCod = ?", (posto_id,))
+                            options = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
+                    except: pass
+                    
+                    if not options: options = ["1", "2", "3", "4", "5"]
+                    
+                    widget = ctk.CTkComboBox(frame, values=options, font=("Arial", 13), height=32, dropdown_font=("Arial", 13))
+                    widget.pack(side="left", fill="x", expand=True)
+                    
+                    val = full_data.get(col, "")
+                    if val is not None:
+                        # Se já temos o valor, tentamos setar o item que começa com o ID
+                        found = False
+                        for opt in options:
+                            if opt.startswith(f"{val} -"):
+                                widget.set(opt)
+                                found = True
+                                break
+                        if not found: widget.set(str(val))
+                    
+                    if self.pk_value and i in [1, 2]: 
+                         widget.configure(state="disabled")
+                
+                else:
+                    widget = ctk.CTkEntry(frame, font=("Arial", 13), height=32, border_color="#CBD5E1")
+                    widget.pack(side="left", fill="x", expand=True)
+                    widget.bind("<KeyRelease>", self.force_uppercase)
+                    
+                    if self.pk_value:
+                        val = full_data.get(col, "")
+                        if val is None: val = ""
+                        elif hasattr(val, 'strftime'): val = val.strftime("%d/%m/%Y")
+                        widget.insert(0, str(val).upper())
+                        
+                        # Travar Empresa ou chaves iniciais se for alteração
+                        if i == 0: 
+                            widget.configure(state="disabled", fg_color="#E2E8F0", text_color="#94A3B8")
+                
+                self.fields[col] = widget
+
+            conn.close()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro de Schema", f"Não foi possível mapear os campos da tabela {tabela}:\n\n{str(e)}")
+
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro de Schema", f"Não foi possível mapear os campos da tabela {tabela}:\n\n{str(e)}")
+
+    def force_uppercase(self, event):
+        # Diferenciando se o widget é um CTkEntry (o bind passa o widget interno as vezes)
+        widget = event.widget
+        try:
+            pos = widget.index("insert")
+            val = widget.get().upper()
+            widget.delete(0, "end")
+            widget.insert(0, val)
+            widget.icursor(pos)
+        except: pass
+
+    def salvar(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            tabela = self.table_info['tabela']
+            # Extrair valores tratando o caso de "ID - Descrição" nos ComboBoxes
+            vals = []
+            for col in self.all_columns:
+                raw = self.fields[col].get().upper()
+                if " - " in raw:
+                    raw = raw.split(" - ")[0].strip()
+                vals.append(raw)
+            
+            if self.pk_value: # UPDATE
+                # Caso especial para chaves compostas no WHERE
+                if tabela.upper() == "POBIT" and isinstance(self.pk_value, (list, tuple)):
+                    pk_where = "POEmpCod = ? AND POBomCod = ? AND POBITNroIn = ?"
+                elif tabela.upper() == "POBXB" and isinstance(self.pk_value, (list, tuple)):
+                    pk_where = "POEmpCod = ? AND POMBoCod = ? AND POBomCod = ?"
+                elif isinstance(self.pk_value, (list, tuple)):
+                    pk_where = f"POEmpCod = ? AND {self.all_columns[1]} = ?"
+                else:
+                    pk_where = f"{self.all_columns[0]} = ?"
+                
+                # Campos para SET (todos exceto os que compõem a PK, mas por simplicidade aqui mandamos todos)
+                # O ideal no SQL Server é não atualizar colunas de PK, mas aqui vamos pular a primeira se for Empresa
+                update_cols = self.all_columns
+                set_parts = [f"{c} = ?" for c in update_cols]
+                sql = f"UPDATE {tabela} SET {', '.join(set_parts)} WHERE {pk_where}"
+                
+                params = vals + (list(self.pk_value) if isinstance(self.pk_value, (list, tuple)) else [self.pk_value])
+            else: # INSERT
+                placeholders = ", ".join(["?" for _ in self.all_columns])
+                sql = f"INSERT INTO {tabela} ({', '.join(self.all_columns)}) VALUES ({placeholders})"
+                params = vals
+            
+            cur.execute(sql, params)
+            conn.commit()
+            conn.close()
+            
+            from tkinter import messagebox
+            messagebox.showinfo("Sucesso", "Registro atualizado com sucesso!")
+            if hasattr(self.master, "carregar_dados"):
+                self.master.carregar_dados()
+            
+            # Sincronização Global: Se alterou dados de posto (POEmp), atualizar Hub principal
+            if self.table_info['tabela'] == "POEmp" and hasattr(self.master, 'hub'):
+                try: self.master.hub.carregar_postos_hub()
+                except: pass
+
+            self.destroy()
+            
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", f"Erro ao gravar dados:\n\n{str(e)}")
+
+class TabelaPostoWindow(BaseWindow):
+    def __init__(self, parent, config, info):
+        super().__init__(parent, info['titulo'], info['id_tela'])
+        self.config_db = config
+        self.table_info = info
+        
+        # Adicionar Botão Incluir na Barra Superior (Top Frame)
+        self.btn_incluir = ctk.CTkButton(self.top_frame, text="➕ Incluir Novo", width=140, height=35, font=("Arial", 12, "bold"), fg_color="#2E7D32", hover_color="#1B5E20", command=self.abrir_formulario_incluir)
+        self.btn_incluir.pack(side="right", padx=20, pady=10)
+
+        self.configurar_grid(
+            columns=info['colunas'],
+            headings=info['cabecalhos'],
+            widths=info['widths'],
+            aligns=info['aligns']
+        )
+        
+        # Bind do Duplo Clique para Alterar
+        self.tree.bind("<Double-1>", self.abrir_formulario_alterar)
+        
+        self.after(100, self.carregar_dados)
+
+    def abrir_formulario_incluir(self):
+        FormularioPostoWindow(self, self.config_db, self.table_info)
+
+    def abrir_formulario_alterar(self, event):
+        try:
+            item = self.tree.identify_row(event.y)
+            if not item: return
+            
+            row_values = self.tree.item(item, "values")
+            if not row_values: return
+            
+            tab = self.table_info['tabela'].upper()
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+
+            if tab == "POBIT":
+                pk_val = [posto_id, row_values[0], row_values[3]]
+            elif tab == "POTNQ":
+                pk_val = [posto_id, row_values[0]]
+            elif tab == "POBXB":
+                pk_val = [posto_id, row_values[2], row_values[0]]
+            elif tab == "POEMP":
+                pk_val = row_values[0]
+            else:
+                pk_val = [posto_id, row_values[0]]
+                
+            FormularioPostoWindow(self, self.config_db, self.table_info, pk_value=pk_val)
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro ao Abrir Manutenção", f"Não foi possível abrir a tela de edição:\n\n{str(e)}")
+            print(f"DEBUG Erro abrir manutenção {self.table_info.get('tabela')}: {e}")
+
+    def get_sql_summary(self):
+        return f"TABELA: {self.table_info['tabela']}\nCAMPOS: {', '.join(self.table_info['colunas'])}\n\nMODO CRUD: Ativo (Insert/Update)"
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            cols = ", ".join(self.table_info['colunas'])
+            tab = self.table_info['tabela']
+            
+            # Pega o Posto selecionado globalmente no Dashboard
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            
+            # --- CASO ESPECIAL: CAD_BICOS (POBIT) com JOIN para Bomba ---
+            if tab.upper() == "POBIT":
+                sql = """
+                    SELECT 
+                        t.POBomCod, 
+                        v.POMBoCod, 
+                        b.POBomDes, 
+                        t.POBITNroIn, 
+                        t.POBITDta, 
+                        t.POBITMot, 
+                        t.POBITNom, 
+                        t.POBITCNPJ, 
+                        t.POBITCPF
+                    FROM POBIT t
+                    LEFT JOIN POBxB v ON t.POEmpCod = v.POEmpCod AND t.POBomCod = v.POBomCod
+                    LEFT JOIN POBom b ON v.POEmpCod = b.POEmpCod AND v.POMBoCod = b.POBomCod
+                    WHERE t.POEmpCod = ?
+                    ORDER BY t.POBomCod DESC
+                """
+                cur.execute(sql, (posto_id,))
+            
+            # --- CASO ESPECIAL: CAD_TANQUES (POTnq) com JOIN para Tipo Combustível ---
+            elif tab.upper() == "POTNQ":
+                sql = """
+                    SELECT 
+                        t.POTnqCod, 
+                        t.POTnqDes, 
+                        t.POTnqDesLM, 
+                        t.POLvrCod, 
+                        c.POTCoDes, 
+                        t.POTnqCusUn, 
+                        t.POTnqQtd
+                    FROM POTnq t
+                    LEFT JOIN POTCo c ON t.POTnqTipCo = c.POTCoCod
+                    WHERE t.POEmpCod = ?
+                    ORDER BY t.POTnqCod DESC
+                """
+                cur.execute(sql, (posto_id,))
+            
+            # --- CASO ESPECIAL: VIN_BICO_BOMBA (POBxB) com JOIN Duplo ---
+            elif tab.upper() == "POBXB":
+                sql = """
+                    SELECT 
+                        v.POBomCod, 
+                        b1.POBomDes, 
+                        v.POMBoCod, 
+                        b2.POBomDes, 
+                        v.POBxBSts
+                    FROM POBxB v
+                    LEFT JOIN POBom b1 ON v.POEmpCod = b1.POEmpCod AND v.POBomCod = b1.POBomCod
+                    LEFT JOIN POBom b2 ON v.POEmpCod = b2.POEmpCod AND v.POMBoCod = b2.POBomCod
+                    WHERE v.POEmpCod = ?
+                    ORDER BY v.POMBoCod, v.POBomCod
+                """
+                cur.execute(sql, (posto_id,))
+            
+            # Verifica se a tabela possui a coluna POEmpCod para filtrar
+            # EXCEÇÃO: A tabela POEmp (Cadastro de Postos) deve mostrar TODOS os registros.
+            elif tab.upper() != "POEMP":
+                try:
+                    cur.execute(f"SELECT TOP 0 POEmpCod FROM {tab}")
+                    sql = f"SELECT TOP 1000 {cols} FROM {tab} WHERE POEmpCod = ? ORDER BY {self.table_info['colunas'][0]} DESC"
+                    cur.execute(sql, (posto_id,))
+                except:
+                    # Caso não tenha POEmpCod (EX: POFor, POLvr, POTCo...), carrega sem filtro
+                    sql = f"SELECT TOP 1000 {cols} FROM {tab} ORDER BY {self.table_info['colunas'][0]} DESC"
+                    cur.execute(sql)
+            else:
+                # Caso seja POEmp, mostra todos os postos cadastrados
+                sql = f"SELECT TOP 1000 {cols} FROM {tab} ORDER BY {self.table_info['colunas'][0]}"
+                cur.execute(sql)
+
+            rows = cur.fetchall()
+            
+            for item in self.tree.get_children(): self.tree.delete(item)
+            
+            for r in rows:
+                fmt_vals = []
+                for v in r:
+                    if hasattr(v, 'strftime'): 
+                         fmt_vals.append(v.strftime("%d/%m/%Y"))
+                    else: 
+                         fmt_vals.append(v)
+                self.tree.insert("", "end", values=tuple(fmt_vals))
+            
+            self.re_zebrar()
+            conn.close()
+        except Exception as e:
+            print(f"Erro ao carregar {self.table_info['tabela']}: {e}")
+
 
 
 class AnaliseProdutoWindow(BaseWindow):
@@ -3079,6 +4098,8 @@ class CobrancaClienteWindow(BaseWindow):
                 self.tree.heading(c, text=m["head"] + seta, anchor=m["align"], command=lambda _c=c: self.ordenar_por(_c, not reverse))
             else:
                 self.tree.heading(c, text=m["head"] + " ↕", anchor=m["align"], command=lambda _c=c: self.ordenar_por(_c, False))
+        
+        self.re_zebrar()
 
     def carregar_dados(self):
         try:
@@ -3185,10 +4206,10 @@ class DetalhesParcelasCobrancaWindow(BaseWindow):
         self.seg_situacao.configure(selected_color="#2E7D32") 
 
         self.configurar_grid(
-             columns=("DtaV", "VlNo", "VlAb", "DtaP"),
-             headings=("📅 Vencimento", "💰 Valor Original", "⚠️ Saldo em Aberto", "✅ Data Pagamento"),
-             widths=(160, 200, 200, 160),
-             aligns=("center", "e", "e", "center")
+             columns=("Sit", "DtaV", "VlNo", "VlAb", "DtaP"),
+             headings=("🔍 Sit.", "📅 Vencimento", "💰 Valor Original", "💰 Valor em Aberto", "✅ Data Pagamento"),
+             widths=(60, 160, 180, 200, 160),
+             aligns=("center", "center", "e", "e", "center")
         )
         self.tree.heading("VlNo", anchor="e"); self.tree.heading("VlAb", anchor="e")
         self.grid_frame.grid_configure(padx=0)
@@ -3197,6 +4218,11 @@ class DetalhesParcelasCobrancaWindow(BaseWindow):
         self.scrollbar = ttk.Scrollbar(self.grid_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side="right", fill="y")
+        # Zebrado Colorido por Situação (Verdes e Vermelhos)
+        self.tree.tag_configure('aberta_even', background='#E8F5E9') # Verde 50
+        self.tree.tag_configure('aberta_odd', background='#C8E6C9')  # Verde 100
+        self.tree.tag_configure('paga_even', background='#FFEBEE')   # Vermelho 50
+        self.tree.tag_configure('paga_odd', background='#FFCDD2')    # Vermelho 100
         self.after(100, self.carregar_dados)
 
     def fechar_tela(self): self.hub.abrir_cobranca()
@@ -3206,6 +4232,14 @@ class DetalhesParcelasCobrancaWindow(BaseWindow):
         elif valor == "FECHADAS": self.seg_situacao.configure(selected_color="#C62828", unselected_hover_color="#FFEBEE") 
         else: self.seg_situacao.configure(selected_color="#F9A825", unselected_hover_color="#FFF9C4") 
         self.carregar_dados()
+
+    def re_zebrar(self):
+        """Override p/ zebrado colorido dinâmico por situação (aberta/paga)."""
+        for i, item in enumerate(self.tree.get_children()):
+            vals = self.tree.item(item)['values']
+            prefix = 'aberta' if "🟢" in str(vals[0]) else 'paga'
+            suffix = 'even' if i % 2 == 0 else 'odd'
+            self.tree.item(item, tags=(f"{prefix}_{suffix}",))
 
     def get_sql_summary(self):
         emp = self.config_db.get("empresa", "01")
@@ -3242,11 +4276,20 @@ class DetalhesParcelasCobrancaWindow(BaseWindow):
                 dv, v_nom, v_ab, dp = r
                 v_ab = float(v_ab or 0); v_nom = float(v_nom or 0)
                 t_nom += v_nom; t_ab += v_ab
-                self.tree.insert("", "end", values=(dv.strftime("%d/%m/%Y") if dv else "", fmt(v_nom), fmt(v_ab), dp.strftime("%d/%m/%Y") if dp else "---"), tags=('even' if idx % 2 == 0 else 'odd',))
+                
+                # Ícone de Situação: 🟢 Aberta | 🔴 Fechada
+                sit_icon = "🟢" if v_ab > 0 else "🔴"
+                
+                # Zebrado dinâmico por cor de situação
+                prefix = 'aberta' if v_ab > 0 else 'paga'
+                suffix = 'even' if idx % 2 == 0 else 'odd'
+                tag = f"{prefix}_{suffix}"
+                
+                self.tree.insert("", "end", values=(sit_icon, dv.strftime("%d/%m/%Y") if dv else "", fmt(v_nom), fmt(v_ab), dp.strftime("%d/%m/%Y") if dp else "---"), tags=(tag,))
             
             if hasattr(self, 'tree_totais'):
                 for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
-                self.tree_totais.insert("", "end", values=(f"Registros: {len(rows)}", fmt(t_nom), fmt(t_ab), ""))
+                self.tree_totais.insert("", "end", values=("", f"Registros: {len(rows)}", fmt(t_nom), fmt(t_ab), ""))
             conn.close()
         except Exception: pass
 
@@ -3277,9 +4320,9 @@ class ExcluirClientesInativosWindow(BaseWindow):
 
         # --- NOVO PADRAO: Usar configurar_grid ---
         cols = ("Rank", "Cod", "Nome", "UltVenc", "VlAb", "MedMensal", "Status")
-        heads = ("🏆 #", "🔑 Cód", "👤 Cliente", "📅 Último Vencimento", "💰 Saldo", "📈 Média", "🔘")
+        heads = ("🏆 #", "🔑 Código", "👤 Nome", "📅 Último Vencimento", "💰 Valor em Aberto", "📈 Média", "🔘")
         # Larguras otimizadas e stretch (Coluna Det removida conforme pedido)
-        wids = (50, 90, 480, 155, 140, 140, 180)
+        wids = (50, 100, 480, 155, 180, 140, 180)
         aligns = ("center", "center", "w", "center", "e", "e", "center")
         self.configurar_grid(cols, heads, wids, aligns)
         
@@ -3797,10 +4840,10 @@ class DetalhesParcelasInativosWindow(BaseWindow):
         self.seg_situacao.configure(selected_color="#2E7D32") 
 
         self.configurar_grid(
-             columns=("DtaV", "VlNo", "VlAb", "DtaP"),
-             headings=("📅 Vencimento", "💰 Valor Original", "⚠️ Saldo em Aberto", "✅ Data Pagamento"),
-             widths=(160, 200, 200, 160),
-             aligns=("center", "e", "e", "center")
+             columns=("Sit", "DtaV", "VlNo", "VlAb", "DtaP"),
+             headings=("🔍 Sit.", "📅 Vencimento", "💰 Valor Original", "💰 Valor em Aberto", "✅ Data Pagamento"),
+             widths=(60, 160, 180, 200, 160),
+             aligns=("center", "center", "e", "e", "center")
         )
         self.tree.heading("VlNo", anchor="e"); self.tree.heading("VlAb", anchor="e")
         self.grid_frame.grid_configure(padx=0)
@@ -3809,6 +4852,11 @@ class DetalhesParcelasInativosWindow(BaseWindow):
         self.scrollbar = ttk.Scrollbar(self.grid_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side="right", fill="y")
+        # Zebrado Colorido por Situação (Verdes e Vermelhos)
+        self.tree.tag_configure('aberta_even', background='#E8F5E9') # Verde 50
+        self.tree.tag_configure('aberta_odd', background='#C8E6C9')  # Verde 100
+        self.tree.tag_configure('paga_even', background='#FFEBEE')   # Vermelho 50
+        self.tree.tag_configure('paga_odd', background='#FFCDD2')    # Vermelho 100
         self.after(100, self.carregar_dados)
 
     def fechar_tela(self): self.hub.abrir_excluir_inativos()
@@ -3818,6 +4866,14 @@ class DetalhesParcelasInativosWindow(BaseWindow):
         elif valor == "FECHADAS": self.seg_situacao.configure(selected_color="#C62828", unselected_hover_color="#FFEBEE") 
         else: self.seg_situacao.configure(selected_color="#F9A825", unselected_hover_color="#FFF9C4") 
         self.carregar_dados()
+
+    def re_zebrar(self):
+        """Override p/ zebrado colorido dinâmico por situação (aberta/paga)."""
+        for i, item in enumerate(self.tree.get_children()):
+            vals = self.tree.item(item)['values']
+            prefix = 'aberta' if "🟢" in str(vals[0]) else 'paga'
+            suffix = 'even' if i % 2 == 0 else 'odd'
+            self.tree.item(item, tags=(f"{prefix}_{suffix}",))
 
     def get_sql_summary(self):
         emp = self.config_db.get("empresa", "01")
@@ -3855,11 +4911,20 @@ class DetalhesParcelasInativosWindow(BaseWindow):
                 dv, v_nom, v_ab, dp = r
                 v_ab = float(v_ab or 0); v_nom = float(v_nom or 0)
                 t_nom += v_nom; t_ab += v_ab
-                self.tree.insert("", "end", values=(dv.strftime("%d/%m/%Y") if dv else "", fmt(v_nom), fmt(v_ab), dp.strftime("%d/%m/%Y") if dp else "---"), tags=('even' if idx % 2 == 0 else 'odd',))
+                
+                # Ícone de Situação: 🟢 Aberta | 🔴 Fechada
+                sit_icon = "🟢" if v_ab > 0 else "🔴"
+                
+                # Zebrado dinâmico por cor de situação
+                prefix = 'aberta' if v_ab > 0 else 'paga'
+                suffix = 'even' if idx % 2 == 0 else 'odd'
+                tag = f"{prefix}_{suffix}"
+                
+                self.tree.insert("", "end", values=(sit_icon, dv.strftime("%d/%m/%Y") if dv else "", fmt(v_nom), fmt(v_ab), dp.strftime("%d/%m/%Y") if dp else "---"), tags=(tag,))
             
             if hasattr(self, 'tree_totais'):
                 for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
-                self.tree_totais.insert("", "end", values=(f"Registros: {len(rows)}", fmt(t_nom), fmt(t_ab), ""))
+                self.tree_totais.insert("", "end", values=("", f"Registros: {len(rows)}", fmt(t_nom), fmt(t_ab), ""))
             conn.close()
         except Exception: pass
 
