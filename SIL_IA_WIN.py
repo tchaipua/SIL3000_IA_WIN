@@ -11,6 +11,7 @@ import urllib.parse
 from unidecode import unidecode
 from tkinter import messagebox
 from PIL import Image
+from datetime import datetime, date
 
 import pandas as pd
 import json
@@ -409,36 +410,40 @@ LEFT JOIN CMCEP m ON c.CMCEPCod = m.CMCEPCod
 {where_clause}"""
 
     def mostrar_sql_bruto(self):
-        """Exibe o comando SQL Pronto/Executado em tempo real, centralizado com botão copiar."""
+        """Exibe o comando SQL Pronto/Executado seguindo o padrão premium visual."""
         query = self.get_current_query()
-        
         win = ctk.CTkToplevel(self)
-        win.title("AUDITORIA SQL (ATUALIZA_CEP)")
+        win.title(f"AUDITORIA SQL (ATUALIZA_CEP)")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
         
-        # Centraliza a tela de debug
+        # Centralizar
         w, h = 800, 600
         x = (win.winfo_screenwidth() // 2) - (w // 2)
         y = (win.winfo_screenheight() // 2) - (h // 2)
         win.geometry(f"{w}x{h}+{x}+{y}")
         
-        win.transient(self); win.grab_set()
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
         
-        lbl = ctk.CTkLabel(win, text="🔍 COMANDO SQL TÉCNICO", font=("Arial", 14, "bold"), text_color="#1565C0")
-        lbl.pack(pady=(20, 5))
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
         
-        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
-        txt.pack(fill="both", expand=True, padx=20, pady=10)
-        txt.insert("0.0", query)
-        txt.configure(state="disabled")
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
         
-        footer = ctk.CTkFrame(win, fg_color="transparent")
-        footer.pack(pady=(0, 20))
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
         
-        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
-        btn_copy.pack(side="left", padx=10)
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
         
-        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
-        btn_close.pack(side="right", padx=10)
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
 
     def copiar_sql_debug(self, sql, window):
         self.clipboard_clear(); self.clipboard_append(sql); self.update()
@@ -868,35 +873,40 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
 
     def mostrar_sql_bruto(self):
-        """Exibe o comando SQL dinâmico completo, centralizado com botão copiar."""
+        """Exibe o comando SQL dinâmico completo seguindo o padrão premium visual."""
         query = self.get_current_query()
-        
         win = ctk.CTkToplevel(self)
-        win.title("AUDITORIA SQL: Vendas por Hora")
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
         
-        # Centraliza a tela de debug
+        # Centralizar
         w, h = 800, 600
         x = (win.winfo_screenwidth() // 2) - (w // 2)
         y = (win.winfo_screenheight() // 2) - (h // 2)
         win.geometry(f"{w}x{h}+{x}+{y}")
-        win.transient(self); win.grab_set()
         
-        lbl = ctk.CTkLabel(win, text="📈 COMANDO TÉCNICO FILTRADO (WHERE)", font=("Arial", 14, "bold"), text_color="#1565C0")
-        lbl.pack(pady=(20, 5))
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
         
-        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
-        txt.pack(fill="both", expand=True, padx=20, pady=10)
-        txt.insert("0.0", query)
-        txt.configure(state="disabled")
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
         
-        footer = ctk.CTkFrame(win, fg_color="transparent")
-        footer.pack(pady=(0, 20))
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
         
-        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
-        btn_copy.pack(side="left", padx=10)
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
         
-        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
-        btn_close.pack(side="right", padx=10)
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
+        
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
 
     def copiar_sql_debug(self, sql, window):
         self.clipboard_clear(); self.clipboard_append(sql); self.update()
@@ -1326,11 +1336,19 @@ class MainHub(ctk.CTk):
         self.btn_excluir_inativos = ctk.CTkButton(self.col2_frame, text="🗑️ Excluir Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_excluir_inativos, fg_color="#C62828", hover_color="#B12020")
         self.btn_excluir_inativos.pack(pady=8, padx=15)
 
-        # --- OUTRAS COLUNAS VAZIAS ( placeholder ) ---
-        for col_idx in range(2, 4):
-             f = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#E2E8F0")
-             f.grid(row=0, column=col_idx, sticky="nsew", padx=10, pady=10)
-             ctk.CTkLabel(f, text=f"{col_idx + 1}º Coluna", font=("Arial", 15, "bold"), text_color="#94A3B8").pack(pady=(20, 15))
+        # --- 3º COLUNA ( BI / ANÁLISES ) ---
+        self.col3_frame = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
+        self.col3_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(self.col3_frame, text="3º Coluna", font=("Arial", 15, "bold"), text_color="#1E293B").pack(pady=(20, 15))
+        
+        self.btn_vendas_qtd = ctk.CTkButton(self.col3_frame, text="📊 Vendas Produtos x Qtde", width=btn_width, height=45, font=("Arial", 13, "bold"), 
+                                           command=self.abrir_vendas_quantidade, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_vendas_qtd.pack(pady=8, padx=15)
+
+        # --- OUTRA COLUNA VAZIA ( placeholder ) ---
+        f4 = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#E2E8F0")
+        f4.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
+        ctk.CTkLabel(f4, text="4º Coluna", font=("Arial", 15, "bold"), text_color="#94A3B8").pack(pady=(20, 15))
 
         # --- 5º COLUNA ( POSTO DE COMBUSTÍVEL ) ---
         self.col5_frame = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
@@ -1584,6 +1602,8 @@ class MainHub(ctk.CTk):
     def abrir_analise_parcelas(self): self.abrir_modulo(AnaliseParcelasWindow)
     def abrir_cobranca(self): self.abrir_modulo(CobrancaClienteWindow)
     def abrir_excluir_inativos(self): self.abrir_modulo(ExcluirClientesInativosWindow)
+    def abrir_vendas_quantidade(self): self.abrir_modulo(AnaliseVendasQuantidadeWindow)
+
     def abrir_modulo_detalhes_inativos(self, cod, nome):
         if hasattr(self, "modulo_atual") and self.modulo_atual:
              self.modulo_atual.destroy()
@@ -1764,20 +1784,40 @@ AND (
 ORDER BY c2.CRMovDta DESC"""
 
     def mostrar_sql_bruto(self):
-        """Exibe o comando SQL técnico detalhado para suporte."""
+        """Exibe o comando SQL técnico detalhado seguindo o padrão premium."""
         query = self.get_current_query()
-        win = ctk.CTkToplevel(self); win.title(f"AUDITORIA SQL ({self.id_str})")
+        win = ctk.CTkToplevel(self)
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
+        
+        # Centralizar
         w, h = 800, 600
         x = (win.winfo_screenwidth() // 2) - (w // 2)
         y = (win.winfo_screenheight() // 2) - (h // 2)
-        win.geometry(f"{w}x{h}+{x}+{y}"); win.transient(self); win.grab_set()
+        win.geometry(f"{w}x{h}+{x}+{y}")
         
-        ctk.CTkLabel(win, text="🔍 COMANDO TÉCNICO DE CONCILIAÇÃO", font=("Arial", 14, "bold"), text_color="#1565C0").pack(pady=15)
-        txt = ctk.CTkTextbox(win, font=("Consolas", 12)); txt.pack(fill="both", expand=True, padx=20, pady=10)
-        txt.insert("1.0", query)
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
         
-        ctk.CTkButton(win, text="📋 COPIAR SQL", font=("Arial", 13, "bold"), fg_color="#2E7D32", hover_color="#1B5E20",
-                     command=lambda: self.copiar_sql_debug(query)).pack(pady=15)
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
+        
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
+        
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
+        
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
+        
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
 
     def copiar_sql_debug(self, sql):
         self.clipboard_clear(); self.clipboard_append(sql); self.update()
@@ -2035,7 +2075,7 @@ class ConciliacaoPOCF4Window(ctk.CTkFrame):
         fim_mes = hoje.strftime("%d/%m/%Y")
         
         filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        filter_frame.pack(side="right", padx=20, pady=10)
+        filter_frame.pack(side="left", padx=20, pady=10)
         
         ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
         self.ent_de = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
@@ -2053,7 +2093,38 @@ class ConciliacaoPOCF4Window(ctk.CTkFrame):
                                         fg_color="#0D47A1", hover_color="#1565C0", command=self.carregar_divergencias)
         self.btn_filtrar.pack(side="left", padx=10)
 
-        # --- GRID (TREEVIEW) ---
+        # Summary (Previsão de Totais)
+        self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
+        self.summary_frame.pack(side="bottom", fill="x", padx=20)
+        self.lbl_total = ctk.CTkLabel(self.summary_frame, text="Total de Divergências: 0 registros", font=("Arial", 13, "bold"), text_color="#1E293B")
+        self.lbl_total.pack(side="right", padx=20)
+
+        # Barra inferior de botões (Fixa no fundo)
+        self.bottom_bar = ctk.CTkFrame(self, height=40, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=5)
+        
+        self.btn_voltar = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
+                                       fg_color="transparent", border_width=2, border_color="black", text_color="black", 
+                                       hover_color="#E0E0E0", font=("Arial", 12, "bold"))
+        self.btn_voltar.pack(side="left", padx=(0, 10))
+        
+        self.btn_debug_sql = ctk.CTkButton(self.bottom_bar, text="?", width=35, height=35, fg_color="red", hover_color="#cc0000", text_color="white", font=("Arial", 14, "bold"), corner_radius=20, command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left")
+        
+        id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        id_frame.pack(side="right")
+        
+        ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
+        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
+                     command=self.copiar_id_tela).pack(side="left", padx=5)
+
+        # Barra de Status Persistente
+        self.status_bar = ctk.CTkFrame(self, height=25, fg_color="#E2E8F0", corner_radius=0)
+        self.status_bar.pack(side="bottom", fill="x")
+        self.lbl_status = ctk.CTkLabel(self.status_bar, text="🟢 Sistema Pronto", font=("Arial", 11), text_color="#64748B")
+        self.lbl_status.pack(side="left", padx=20)
+
+        # --- GRID (TREEVIEW) - OCUPA O ESPAÇO RESTANTE ---
         self.grid_container = ctk.CTkFrame(self, fg_color="white")
         self.grid_container.pack(fill="both", expand=True, padx=20, pady=(5, 0))
         
@@ -2065,7 +2136,7 @@ class ConciliacaoPOCF4Window(ctk.CTkFrame):
 
         self.tree = ttk.Treeview(self.grid_container, style="POCF4.Treeview", columns=("data", "tst", "regis", "des", "qtd", "vlr", "status"), show="headings")
         self.tree.pack(fill="both", expand=True)
-        
+
         headings = [
             ("data", "📅 Data"), ("tst", "🔢 Tst"), ("regis", "📋 Registro"), 
             ("des", "📝 Descrição Item"), ("qtd", "📊 Qtd."), ("vlr", "💰 Valor"), ("status", "📢 Divergência")
@@ -2077,36 +2148,6 @@ class ConciliacaoPOCF4Window(ctk.CTkFrame):
             elif col == "status": w = 300
             elif col in ["tst", "regis"]: w = 90
             self.tree.column(col, anchor="center" if col not in ["des", "status"] else "w", width=w)
-        
-        # Summary
-        self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
-        self.summary_frame.pack(fill="x", padx=20)
-        self.lbl_total = ctk.CTkLabel(self.summary_frame, text="Total de Divergências: 0 registros", font=("Arial", 13, "bold"), text_color="#1E293B")
-        self.lbl_total.pack(side="right", padx=20)
-
-        # Barra de Status Persistente
-        self.status_bar = ctk.CTkFrame(self, height=25, fg_color="#E2E8F0", corner_radius=0)
-        self.status_bar.pack(side="bottom", fill="x")
-        self.lbl_status = ctk.CTkLabel(self.status_bar, text="🟢 Sistema Pronto", font=("Arial", 11), text_color="#64748B")
-        self.lbl_status.pack(side="left", padx=20)
-
-        # Barra inferior de botões
-        self.bottom_bar = ctk.CTkFrame(self, height=30, fg_color="transparent")
-        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=5)
-        
-        self.btn_voltar = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
-                                       fg_color="transparent", border_width=2, border_color="black", text_color="black", 
-                                       hover_color="#E0E0E0", font=("Arial", 12, "bold"))
-        self.btn_voltar.pack(side="left")
-        
-        id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
-        id_frame.pack(side="right")
-        
-        ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
-        self.btn_debug_sql = ctk.CTkButton(id_frame, text="?", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="#1565C0", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
-        self.btn_debug_sql.pack(side="left", padx=2)
-        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
-                     command=self.copiar_id_tela).pack(side="left", padx=5)
 
         self.after(500, self.carregar_divergencias)
 
@@ -2114,25 +2155,72 @@ class ConciliacaoPOCF4Window(ctk.CTkFrame):
         if hasattr(self, 'hub') and self.hub: self.hub.abrir_posto()
 
     def copiar_id_tela(self):
-        resumo = self.get_sql_summary()
         self.clipboard_clear()
         self.clipboard_append(self.id_str)
-        messagebox.showinfo("Informação do Sistema", f"NOME DA TELA COPIADO: {self.id_str}\n\n{resumo}")
+        # Apenas copia, seguindo o padrão simplificado solicitado
 
-    def get_sql_summary(self):
+
+    def get_current_query(self):
         de_raw = self.ent_de.get().strip()
         ate_raw = self.ent_ate.get().strip()
-        return (
-            "--- ESTRUTURA SQL (AUDITORIA POCF4 x POCF1) ---\n"
-            "ORIGEM: POCF4 (Itens de Caixa/Frentista)\n"
-            "DESTINO: POCF1 (Registros de Caixa Consolidados)\n\n"
-            "CHAVES DE BATIMENTO:\n"
-            "- Empresa (POEmpCod)\n"
-            "- Teste (POCF4Tst = POCF1Tst)\n"
-            "- Registro (POCF4Regis = POCF1Regis)\n\n"
-            "FILTRO:\n"
-            f"  Data entre '{de_raw}' e '{ate_raw}'"
-        )
+        posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+        try:
+            from datetime import datetime
+            di = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            df = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+        except: di, df = '1900-01-01', '1900-01-01'
+
+        return f"""
+            SELECT 
+                c2.CRMovDta, c2.CRMovSeq, c4.CRMov4Ite, c2.CRMov2CodC as CliID, c2.CRMov2DesC as CliNome,
+                c4.CEProCod as ProCod, COALESCE(p.CEProDes, 'N/D') as ProDes,
+                COALESCE(c4.CRMov4Qtd, 0) as Qtd, COALESCE(c4.CRMov4VlrA, 0) as Preco,
+                (SELECT COUNT(*) FROM POCF1 s WHERE s.POEmpCod = c2.CMEmpCod AND s.POCF1DtaMo = c2.CRMovDta AND s.POCF1SeqMo = c2.CRMovSeq AND s.POCF1IteMo = c4.CRMov4Ite) as QtdVendas
+            FROM CRMov2 c2
+            JOIN CRMov4 c4 ON c2.CMEmpCod = c4.CMEmpCod AND c2.CRMovDta = c4.CRMovDta AND c2.CRMovSeq = c4.CRMovSeq
+            LEFT JOIN CEPro p ON p.CEProCod = c4.CEProCod
+            WHERE c2.CMEmpCod = {posto_id} 
+            AND CAST(c2.CRMovDta AS DATE) BETWEEN '{di}' AND '{df}'
+            AND c4.CEProCod < 10
+            AND (NOT EXISTS (SELECT 1 FROM POCF1 s WHERE s.POEmpCod = c2.CMEmpCod AND s.POCF1DtaMo = c2.CRMovDta AND s.POCF1SeqMo = c2.CRMovSeq AND s.POCF1IteMo = c4.CRMov4Ite) OR (SELECT COUNT(*) FROM POCF1 s WHERE s.POEmpCod = c2.CMEmpCod AND s.POCF1DtaMo = c2.CRMovDta AND s.POCF1SeqMo = c2.CRMovSeq AND s.POCF1IteMo = c4.CRMov4Ite) > 1)
+            ORDER BY c2.CRMovDta DESC
+        """.strip()
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL Pronto/Executado em tempo real, seguindo o padrão premium."""
+        query = self.get_current_query()
+        win = ctk.CTkToplevel(self)
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
+        
+        # Centralizar
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
+        
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
+        
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
+        
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
+        
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
+        
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
 
     def abrir_calendario(self, entry_target):
         pop = ctk.CTkToplevel(self)
@@ -2267,17 +2355,16 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
         self.top_frame = ctk.CTkFrame(self, fg_color="#F1F5F9", corner_radius=0)
         self.top_frame.pack(side="top", fill="x")
 
-        # Título
-        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: POCF1 x CRMov4", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
-        
         # Filtros de Data (por POCF1Tst)
-        from datetime import datetime, date
         hoje = date.today()
         ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
         fim_mes = hoje.strftime("%d/%m/%Y")
-        
+
         filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        filter_frame.pack(side="right", padx=20, pady=10)
+        filter_frame.pack(side="left", padx=20, pady=10)
+        
+        # Título (Movido para a direita)
+        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: POCF1 x CRMov4", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="right", padx=20, pady=10)
         
         ctk.CTkLabel(filter_frame, text="Período Teste:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
         ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 10), text_color="#64748B").pack(side="left", padx=2)
@@ -2338,13 +2425,18 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
         ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
                       fg_color="transparent", border_width=2, border_color="black", text_color="black", 
                       hover_color="#E0E0E0", font=("Arial", 12, "bold")).pack(side="left")
+
+        self.btn_debug_sql = ctk.CTkButton(self.bottom_bar, text="?", width=28, height=28, corner_radius=14, 
+                                          fg_color="#C62828", hover_color="#B12020", text_color="white", 
+                                          font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=15)
+        ToolTip(self.btn_debug_sql, "VER COMANDO SQL BRUTO (Audit)")
         
         id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
         id_frame.pack(side="right")
         ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
-        self.btn_debug_sql = ctk.CTkButton(id_frame, text="?", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="#1565C0", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
-        self.btn_debug_sql.pack(side="left", padx=2)
-        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
+        
+        ctk.CTkButton(id_frame, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
                      command=self.copiar_id_tela).pack(side="left", padx=5)
 
         self.after(500, self.carregar_divergencias)
@@ -2353,9 +2445,8 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
         if hasattr(self, 'hub') and self.hub: self.hub.abrir_posto()
 
     def copiar_id_tela(self):
-        resumo = self.get_sql_summary()
         self.clipboard_clear(); self.clipboard_append(self.id_str)
-        messagebox.showinfo("Informação do Sistema", f"NOME DA TELA COPIADO: {self.id_str}\n\n{resumo}")
+        messagebox.showinfo("Informação", f"Copiado ID da Tela: {self.id_str}")
 
     def get_sql_summary(self):
         de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
@@ -2373,7 +2464,7 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
 
     def abrir_calendario(self, entry_target):
         pop = ctk.CTkToplevel(self); pop.title("📅 Data"); pop.geometry("320x400"); pop.attributes("-topmost", True); pop.grab_set()
-        from datetime import date; import calendar; hoje = date.today(); cal_state = {"mes": hoje.month, "ano": hoje.year}
+        import calendar; hoje = date.today(); cal_state = {"mes": hoje.month, "ano": hoje.year}
         main_f = ctk.CTkFrame(pop, fg_color="white"); main_f.pack(fill="both", expand=True, padx=10, pady=10)
         header_f = ctk.CTkFrame(main_f, fg_color="transparent"); header_f.pack(fill="x", pady=5)
         lbl_mes_ano = ctk.CTkLabel(header_f, text="", font=("Arial", 14, "bold"), text_color="#1E88E5")
@@ -2400,6 +2491,72 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
             entry_target.delete(0, "end"); entry_target.insert(0, f"{dia:02d}/{cal_state['mes']:02d}/{cal_state['ano']}"); pop.destroy()
         update_view()
 
+    def get_current_query(self):
+        """Retorna a query de auditoria formatada."""
+        try:
+            de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+            de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, "hub") and self.hub else 1
+            return f"""SELECT 
+    f1.POCF1DtaMo, f1.POCF1SeqMo, f1.POCF1IteMo, f1.POCF1Regis,
+    COALESCE(f1.POCF1ProDe, 'DESC. N/D') as ProDe, COALESCE(f1.POCF1Obs, '') as Obs,
+    f1.POCF1VlrMo,
+    (SELECT COUNT(*) FROM CRMov4 c4 
+     WHERE c4.CMEmpCod = f1.POEmpCod AND c4.CRMovDta = f1.POCF1DtaMo 
+     AND c4.CRMovSeq = f1.POCF1SeqMo AND c4.CRMov4Ite = f1.POCF1IteMo) as QtdConc
+FROM POCF1 f1
+WHERE f1.POEmpCod = {posto_id} 
+AND CAST(f1.POCF1Tst AS DATE) BETWEEN '{de}' AND '{ate}'
+AND f1.POCF1Regis <> 0 AND f1.POCF1VlrMo <> 0
+AND (
+    NOT EXISTS (SELECT 1 FROM CRMov4 c4 
+                WHERE c4.CMEmpCod = f1.POEmpCod AND c4.CRMovDta = f1.POCF1DtaMo 
+                AND c4.CRMovSeq = f1.POCF1SeqMo AND c4.CRMov4Ite = f1.POCF1IteMo)
+    OR 
+    (SELECT COUNT(*) FROM CRMov4 c4 
+     WHERE c4.CMEmpCod = f1.POEmpCod AND c4.CRMovDta = f1.POCF1DtaMo 
+     AND c4.CRMovSeq = f1.POCF1SeqMo AND c4.CRMov4Ite = f1.POCF1IteMo) > 1
+)
+ORDER BY f1.POCF1DtaMo DESC"""
+        except: return "Erro ao gerar SQL. Verifique as datas."
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL seguindo o padrão premium visual."""
+        query = self.get_current_query()
+        win = ctk.CTkToplevel(self)
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
+        
+        # Centralizar
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
+        
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
+        
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
+        
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
+        
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
+        
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
+
     def carregar_divergencias(self):
         try:
             import pyodbc; from datetime import datetime
@@ -2421,7 +2578,7 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
                     f1.POCF1Regis,
                     COALESCE(f1.POCF1ProDe, 'DESC. N/D') as ProDe, 
                     COALESCE(f1.POCF1Obs, '') as Obs,
-                    f1.POCF1VlrBo,
+                    f1.POCF1VlrMo,
                     (SELECT COUNT(*) FROM CRMov4 c4 
                      WHERE c4.CMEmpCod = f1.POEmpCod 
                      AND c4.CRMovDta = f1.POCF1DtaMo 
@@ -2431,7 +2588,7 @@ class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
                 WHERE f1.POEmpCod = ? 
                 AND CAST(f1.POCF1Tst AS DATE) BETWEEN ? AND ?
                 AND f1.POCF1Regis <> 0 
-                AND f1.POCF1VlrBo <> 0
+                AND f1.POCF1VlrMo <> 0
                 AND (
                     NOT EXISTS (SELECT 1 FROM CRMov4 c4 
                                 WHERE c4.CMEmpCod = f1.POEmpCod 
@@ -2740,41 +2897,44 @@ class BaseWindow(ctk.CTkFrame):
         messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
 
     def mostrar_sql_bruto(self):
-        """Exibe o comando SQL Pronto/Executado em tempo real, centralizado com botão copiar."""
-        # Tenta gerar a query atual (dinâmica) ou usa a última capturada
+        """Exibe o comando SQL Pronto/Executado seguindo o padrão premium visual."""
         query = self.get_current_query() if hasattr(self, 'get_current_query') else getattr(self, 'ultima_query_bruta', "")
-        
         if not query:
-            messagebox.showinfo("SQL Bruto", "Aguardando carregamento de dados (Gere a busca primeiro)...")
+            messagebox.showinfo("SQL Bruto", "Aguardando carregamento de dados...")
             return
-        
+            
         win = ctk.CTkToplevel(self)
         win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
         
-        # Centraliza a tela de debug
+        # Centralizar
         w, h = 800, 600
         x = (win.winfo_screenwidth() // 2) - (w // 2)
         y = (win.winfo_screenheight() // 2) - (h // 2)
         win.geometry(f"{w}x{h}+{x}+{y}")
         
-        win.transient(self); win.grab_set()
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 16, "bold"), text_color="#1565C0").pack(pady=(25, 15))
         
-        lbl = ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 14, "bold"), text_color="#1565C0")
-        lbl.pack(pady=(20, 5))
+        f = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        f.pack(fill="both", expand=True, padx=40, pady=10)
         
-        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
-        txt.pack(fill="both", expand=True, padx=20, pady=10)
-        txt.insert("0.0", query)
-        txt.configure(state="disabled")
+        t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        t.pack(fill="both", expand=True, padx=15, pady=15)
+        t.insert("0.0", query)
+        t.configure(state="disabled")
         
-        footer = ctk.CTkFrame(win, fg_color="transparent")
-        footer.pack(pady=(0, 20))
+        btn_f = ctk.CTkFrame(win, fg_color="transparent")
+        btn_f.pack(pady=25)
         
-        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
-        btn_copy.pack(side="left", padx=10)
+        ctk.CTkButton(btn_f, text="📋 COPIAR SQL", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#2E7D32", hover_color="#1B5E20", corner_radius=8,
+                     command=lambda: [self.clipboard_clear(), self.clipboard_append(query), self.update(), messagebox.showinfo("OK", "Copiado!")]).pack(side="left", padx=10)
         
-        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
-        btn_close.pack(side="right", padx=10)
+        ctk.CTkButton(btn_f, text="FECHAR", width=170, height=40, font=("Arial", 13, "bold"), 
+                     fg_color="#475569", hover_color="#334155", corner_radius=8,
+                     command=win.destroy).pack(side="left", padx=10)
 
     def copiar_sql_debug(self, sql, window):
         """Copia para o clipboard com feedback."""
@@ -3982,10 +4142,315 @@ ORDER BY {order_by}"""
         except Exception as e: messagebox.showerror("Erro PDF", str(e))
 
     def fechar_tela(self):
-         self.pack_forget()
-         if hasattr(self, 'hub') and hasattr(self.hub, 'modules_frame'):
-              self.hub.modules_frame.pack(fill="both", expand=True, padx=30, pady=30)
-         self.destroy()
+        if hasattr(self, 'hub') and self.hub:
+             self.hub.fechar_modulo_atual()
+
+class AnaliseVendasQuantidadeWindow(BaseWindow):
+    def __init__(self, parent, config):
+        super().__init__(parent, "Análise de Vendas: Produtos x Qtde", "VENDAS_QTDE")
+        self.config_db = config
+        self.rows_cache = []
+        self.anos_comp = 3 
+
+        # --- BARRA DE FILTROS ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="top", fill="x", padx=20, pady=5)
+
+        # Início dos controles
+        ctk.CTkLabel(self.filter_frame, text="Comparar:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_comp = ctk.CTkComboBox(self.filter_frame, values=["2 Anos", "3 Anos", "4 Anos", "5 Anos"], width=100, command=self.mudar_comp)
+        self.combo_comp.pack(side="left", padx=5); self.combo_comp.set("3 Anos")
+
+        ctk.CTkLabel(self.filter_frame, text="Grupo:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_grupo = ctk.CTkComboBox(self.filter_frame, width=140, command=self.selecionar_grupo)
+        self.combo_grupo.pack(side="left", padx=5)
+
+        ctk.CTkLabel(self.filter_frame, text="Sub-Grupo:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_subgrupo = ctk.CTkComboBox(self.filter_frame, width=140, command=self.selecionar_subgrupo)
+        self.combo_subgrupo.pack(side="left", padx=5)
+
+        ctk.CTkLabel(self.filter_frame, text="Produto:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_produto = ctk.CTkComboBox(self.filter_frame, width=180)
+        self.combo_produto.pack(side="left", padx=5); self.combo_produto.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=120)
+        self.combo_mes.pack(side="left", padx=5); self.combo_mes.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Gráfico:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_tipo_grafico = ctk.CTkComboBox(self.filter_frame, values=["Barras", "Linhas"], width=100)
+        self.combo_tipo_grafico.pack(side="left", padx=5); self.combo_tipo_grafico.set("Barras")
+
+        self.var_detalhar = ctk.BooleanVar(value=False)
+        self.check_detalhar = ctk.CTkCheckBox(self.filter_frame, text="Detalhar por Mês", variable=self.var_detalhar, font=("Arial", 11, "bold"))
+        self.check_detalhar.pack(side="left", padx=10)
+
+        btn_go = ctk.CTkButton(self.filter_frame, text="📊 Analisar", width=100, fg_color="#1E88E5", command=self.carregar_dados)
+        btn_go.pack(side="left", padx=10)
+
+        # Ocultar a Treeview da BaseWindow para focar só em gráficos
+        if hasattr(self, 'tree'): self.tree.pack_forget()
+        
+        # Container de Gráficos (Sempre visível)
+        self.charts_frame = ctk.CTkFrame(self.grid_frame, fg_color="white")
+        self.charts_frame.pack(fill="both", expand=True)
+        
+        self.after(200, self.carregar_combos_filtros)
+
+    def mudar_comp(self, val):
+        self.anos_comp = int(val.split(" ")[0])
+
+    def carregar_combos_filtros(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT CEGrpCod, CEGrpDes FROM CEGrp ORDER BY CEGrpDes")
+                self.combo_grupo.configure(values=["Todos"] + [f"{int(r[0])} - {str(r[1]).strip()}" for r in cur.fetchall() if r[1]])
+                self.combo_grupo.set("Todos")
+                self.combo_subgrupo.configure(values=["Todos"])
+                self.combo_subgrupo.set("Todos")
+                self.atualizar_combo_produtos()
+        except: pass
+
+    def selecionar_grupo(self, val):
+        if val == "Todos":
+            self.combo_subgrupo.configure(values=["Todos"])
+            self.combo_subgrupo.set("Todos")
+            self.atualizar_combo_produtos()
+            return
+        
+        gid = val.split(" - ")[0]
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor()
+                cur.execute(f"SELECT CESgrCod, CESgrDes FROM CESgr WHERE CEGrpCod={gid} ORDER BY CESgrDes")
+                subs = ["Todos"] + [f"{int(r[0])} - {str(r[1]).strip()}" for r in cur.fetchall() if r[1]]
+                self.combo_subgrupo.configure(values=subs)
+                self.combo_subgrupo.set("Todos")
+            self.atualizar_combo_produtos()
+        except: pass
+
+    def selecionar_subgrupo(self, val):
+        self.atualizar_combo_produtos()
+
+    def atualizar_combo_produtos(self):
+        try:
+            import pyodbc
+            grp_v = self.combo_grupo.get()
+            sub_v = self.combo_subgrupo.get()
+            
+            where_grp = f"AND CEGrpCod = {grp_v.split(' - ')[0]}" if grp_v != "Todos" else ""
+            where_sub = f"AND CESgrCod = {sub_v.split(' - ')[0]}" if sub_v != "Todos" else ""
+            
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor()
+                cur.execute(f"SELECT CEProCod, CEProDes FROM CEPro WHERE 1=1 {where_grp} {where_sub} ORDER BY CEProDes")
+                prods = ["Todos"] + [f"{int(r[0])} - {str(r[1]).strip().upper()}" for r in cur.fetchall()]
+                self.combo_produto.configure(values=prods[:500])
+                self.combo_produto.set("Todos")
+        except: pass
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            ano_corrente = date.today().year 
+            mes_sel = self.combo_mes.get()
+            grp_v = self.combo_grupo.get()
+            sub_v = self.combo_subgrupo.get()
+            prod_v = self.combo_produto.get()
+            
+            necessita_cepro = (grp_v != "Todos" or sub_v != "Todos" or prod_v != "Todos")
+            join_sql = "JOIN cepro p ON c4.ceprocod = p.ceprocod" if necessita_cepro else ""
+            where_mes = f"AND MONTH(c2.CRMovDta) = {self.meses_ext.index(mes_sel)}" if mes_sel != "Todos" else ""
+            where_grp = f"AND p.CEGrpCod = {grp_v.split(' - ')[0]}" if grp_v != "Todos" else ""
+            where_sub = f"AND p.CESgrCod = {sub_v.split(' - ')[0]}" if sub_v != "Todos" else ""
+            where_prod = f"AND p.CEProCod = {prod_v.split(' - ')[0]}" if prod_v != "Todos" else ""
+
+            self.anos_analisados = sorted([ano_corrente - i for i in range(self.anos_comp + 1)])
+            
+            sql = f"""
+                SELECT YEAR(c2.CRMovDta) as Ano, MONTH(c2.CRMovDta) as Mes, SUM(c4.CRMov4Qtd) as Qtd
+                FROM crmov4 c4
+                JOIN crmov2 c2 ON c4.cmempcod = c2.cmempcod AND c4.cmfilcod = c2.cmfilcod AND c4.crmovdta = c2.crmovdta AND c4.crmovseq = c2.crmovseq
+                {join_sql}
+                WHERE c2.CRMov2Flag IN ('A', 'F') AND YEAR(c2.CRMovDta) BETWEEN {min(self.anos_analisados)} AND {ano_corrente}
+                {where_mes} {where_grp} {where_sub} {where_prod}
+                GROUP BY YEAR(c2.CRMovDta), MONTH(c2.CRMovDta)
+                ORDER BY Ano, Mes
+            """
+            
+            self.ultima_query_bruta = sql
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor(); cur.execute(sql)
+                # rows = [(2023, 1, 100), (2023, 2, 120)...]
+                self.rows_cache = [list(r) for r in cur.fetchall()]
+            
+            self.renderizar_graficos()
+        except Exception as e: messagebox.showerror("Erro BI", str(e))
+
+    def renderizar_graficos(self):
+        for w in self.charts_frame.winfo_children(): w.destroy()
+        if not self.rows_cache: return
+        try:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            
+            fig, ax = plt.subplots(figsize=(10, 5))
+            detalhar_mes = self.var_detalhar.get()
+            tipo_grafico = self.combo_tipo_grafico.get()
+            
+            def format_val(val): return f"{int(val):,}".replace(",", ".")
+
+            elements_list = []
+            labels_info = []
+            num_anos = len(self.anos_analisados)
+
+            hoje = date.today()
+            ano_atual = hoje.year
+            mes_limite = hoje.month - 1 # Só meses fechados para comparação % do ano atual
+            if mes_limite == 0: mes_limite = 1 
+
+            # Agregação manual dos dados vindos por mês
+            ano_totals = []
+            ano_labels_rich = []
+            
+            for i, ano in enumerate(self.anos_analisados):
+                # Total real acumulado (usado na legeda e gráfico anual)
+                total_real = sum(r[2] for r in self.rows_cache if r[0] == ano)
+                ano_totals.append(total_real)
+                
+                perc_str = ""
+                if i > 0:
+                    prev_ano = self.anos_analisados[i-1]
+                    # Se estamos calculando a variação do ano atual (ou comparando com ele)
+                    if ano == ano_atual:
+                        v_atual_comp = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] <= mes_limite)
+                        v_prev_comp = sum(r[2] for r in self.rows_cache if r[0] == prev_ano and r[1] <= mes_limite)
+                        if v_prev_comp > 0:
+                            diff = ((v_atual_comp - v_prev_comp) / v_prev_comp) * 100
+                            perc_str = f" ({'+' if diff >= 0 else ''}{diff:.1f}%)"
+                    else:
+                        # Comparação normal de anos cheios
+                        v_atual_full = total_real
+                        v_prev_full = sum(r[2] for r in self.rows_cache if r[0] == prev_ano)
+                        if v_prev_full > 0:
+                            diff = ((v_atual_full - v_prev_full) / v_prev_full) * 100
+                            perc_str = f" ({'+' if diff >= 0 else ''}{diff:.1f}%)"
+                
+                ano_labels_rich.append(f"{ano}: {format_val(total_real)}{perc_str}")
+
+            if detalhar_mes:
+                # Eixo X fixo de Janeiro a Dezembro (ou de acordo com os meses_ext)
+                meses_labels = self.meses_ext[1:13] 
+                x = np.arange(len(meses_labels))
+                width = 0.8 / num_anos
+                
+                for i, ano in enumerate(self.anos_analisados):
+                    # Como agora o cache é (Ano, Mes, Qtd), filtramos por ano e mes (1-12)
+                    qtds_meses = []
+                    for m_idx in range(1, 13):
+                        v = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] == m_idx)
+                        qtds_meses.append(v)
+                    
+                    label_l = ano_labels_rich[i]
+                    if tipo_grafico == "Barras":
+                        offset = (i - (num_anos-1)/2) * width
+                        elem = ax.bar(x + offset, qtds_meses, width, label=label_l)
+                    else:
+                        elem = ax.plot(x, qtds_meses, marker='o', linewidth=2, label=label_l)
+                    
+                    elements_list.append(elem)
+                
+                ax.set_xticks(x)
+                ax.set_xticklabels(meses_labels, rotation=45, fontsize=9)
+                ax.legend(fontsize=11, loc='upper left', bbox_to_anchor=(1, 1))
+                labels_info = meses_labels
+            else:
+                # Visão Anual: Usamos os totais já calculados
+                anos_labels = [str(a) for a in self.anos_analisados]
+                totais = ano_totals
+                
+                if tipo_grafico == "Barras":
+                    elem = ax.bar(anos_labels, totais, color="#1E88E5", width=0.5)
+                    for rect in elem:
+                        val = rect.get_height()
+                        ax.annotate(format_val(val), xy=(rect.get_x() + rect.get_width() / 2, val),
+                                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=9, fontweight="bold")
+                    ax.set_xticklabels(ano_labels_rich, rotation=15, fontsize=9)
+                else:
+                    elem = ax.plot(anos_labels, totais, marker='o', color="#1E88E5", linewidth=3)
+                    for i, v in enumerate(totais):
+                        ax.annotate(format_val(v), (anos_labels[i], v), xytext=(0, 10), textcoords="offset points", ha='center', fontsize=9, fontweight="bold")
+                    ax.set_xticklabels(ano_labels_rich, rotation=15, fontsize=9)
+                
+                elements_list.append(elem)
+                labels_info = anos_labels
+
+            ax.set_title(f"Evolução de Vendas ({tipo_grafico})", fontsize=12, fontweight="bold")
+            
+            # --- INTERATIVIDADE (Hover) ---
+            annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points",
+                               bbox=dict(boxstyle="round", fc="white", ec="gray", alpha=0.9),
+                               arrowprops=dict(arrowstyle="->"))
+            annot.set_visible(False)
+
+            def update_annot(x, y, txt):
+                annot.xy = (x, y)
+                annot.set_text(txt)
+                annot.get_bbox_patch().set_alpha(0.8)
+
+            def hover(event):
+                if event.inaxes == ax:
+                    found = False
+                    for idx_serie, elem in enumerate(elements_list):
+                        if tipo_grafico == "Barras":
+                            for idx_bar, bar in enumerate(elem):
+                                cont, _ = bar.contains(event)
+                                if cont:
+                                    val = bar.get_height()
+                                    txt = f"Ano: {self.anos_analisados[idx_serie] if detalhar_mes else self.anos_analisados[idx_bar]}\nQtde: {format_val(val)}"
+                                    if detalhar_mes: txt = f"Mês: {labels_info[idx_bar]}\n" + txt
+                                    update_annot(bar.get_x() + bar.get_width()/2, val, txt)
+                                    annot.set_visible(True); fig.canvas.draw_idle()
+                                    found = True; break
+                        else:
+                            # Para Linhas, usamos o picker ou proximidade
+                            # plot retorna lista de Line2D. elements_list[idx_serie] é uma lista de 1 elemento
+                            line = elem[0]
+                            cont, ind = line.contains(event)
+                            if cont:
+                                idx_pt = ind['ind'][0]
+                                xdata, ydata = line.get_data()
+                                val = ydata[idx_pt]
+                                txt = f"Ano: {self.anos_analisados[idx_serie] if detalhar_mes else self.anos_analisados[idx_pt]}\nQtde: {format_val(val)}"
+                                if detalhar_mes: txt = f"Mês: {labels_info[idx_pt]}\n" + txt
+                                update_annot(xdata[idx_pt], ydata[idx_pt], txt)
+                                annot.set_visible(True); fig.canvas.draw_idle()
+                                found = True; break
+                        if found: break
+                    
+                    if not found and annot.get_visible():
+                        annot.set_visible(False); fig.canvas.draw_idle()
+
+            fig.canvas.mpl_connect("motion_notify_event", hover)
+            ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
+            fig.tight_layout()
+            
+            canvas = FigureCanvasTkAgg(fig, master=self.charts_frame)
+            canvas.draw(); canvas.get_tk_widget().pack(fill="both", expand=True)
+            plt.close(fig)
+        except Exception as e: print(f"Erro Chart: {e}")
+
+
+
 
 
 # [Bloco __main__ movido para o final definitivo do arquivo]

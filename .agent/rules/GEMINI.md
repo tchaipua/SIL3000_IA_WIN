@@ -106,6 +106,18 @@ When auto-applying an agent, inform the user:
 7. **Scope Control**: Fix ONLY the specific problem requested. No "proactive" unrelated improvements.
 8. **Preservação de SQL**: NUNCA alterar os métodos `get_sql_summary` ou qualquer string de instrução SQL vinculada ao botão 📋. Este conteúdo é definitivo e deve ser preservado em todas as telas.
 
+### 💎 VIP Design Patterns (LOCKED)
+
+**SQL Auditoria Window (Padrão Obrigatório):**
+- **Título**: `AUDITORIA SQL ({self.id_str})`
+- **Cabeçalho**: `🔍 COMANDO SQL PRONTO PARA EXECUÇÃO` (Azul #1565C0, centralizado).
+- **Fundo Janela**: Cinza claro #F1F5F9.
+- **Container Texto**: Frame branco com corner_radius=12.
+- **Botões de Rodapé**: 
+  - `📋 COPIAR SQL`: Verde #2E7D32, corner_radius=8.
+  - `FECHAR`: Cinza Escuro #475569, corner_radius=8.
+- **Comportamento**: Sempre centralizada w=800, h=600.
+
 ### 🌐 Language Handling
 
 When user's prompt is NOT in English:
