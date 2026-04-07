@@ -13,6 +13,7 @@ from tkinter import messagebox
 from PIL import Image
 
 import pandas as pd
+import json
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
@@ -52,7 +53,6 @@ class TabelaConfigWindow(ctk.CTkToplevel):
     def __init__(self, parent, config, update_callback):
         super().__init__(parent)
         self.grab_set()  # Trava a janela pai
-        self.grab_set()  # Trava a janela pai
         self.title("Mapeamento da Tabela")
         
         # Centraliza a tela
@@ -62,7 +62,6 @@ class TabelaConfigWindow(ctk.CTkToplevel):
         self.geometry(f"{w}x{h}+{x}+{y}")
         
         self.transient(parent)
-        self.grab_set() 
         self.update_callback = update_callback
         
         # 1. Barra de Identificação de Tela (Absolute Bottom)
@@ -95,7 +94,6 @@ class TabelaConfigWindow(ctk.CTkToplevel):
         self.lbl_title = ctk.CTkLabel(self, text="⚙️ MAPEAMENTO DA TABELA", font=ctk.CTkFont(size=18, weight="bold"), text_color="#1565C0", anchor="w")
         self.lbl_title.pack(pady=(20, 10), padx=30, fill="x")
 
-
         self.e_tabela = self.criar_input("Nome da Tabela", config["tabela"])
         self.e_id = self.criar_input("Coluna do ID/Código", config["col_id"])
         self.e_nome = self.criar_input("Coluna do Nome", config["col_nome"])
@@ -105,40 +103,106 @@ class TabelaConfigWindow(ctk.CTkToplevel):
         self.e_bairro = self.criar_input("Coluna do Bairro", config["col_bairro"])
         self.e_uf = self.criar_input("Estado sempre (Valor Fixo)", config["col_uf"])
 
-    
-    def acao_copiar_e_sql(self):
-        try:
-            self.clipboard_clear()
-            self.clipboard_append(self.id_str)
-            summary = self.get_sql_summary()
-            msg = f"NOME DA TELA COPIADO: {self.id_str}\n\n--- ESTRUTURA SQL (RESUMO) ---\n{summary}"
-            from tkinter import messagebox
-            messagebox.showinfo("Informação do Sistema", msg)
-        except Exception as e:
-            from tkinter import messagebox
-            messagebox.showerror("Erro", f"Erro ao processar comando: {e}")
-
-    def get_sql_summary(self):
-        ano = self.combo_ano.get()
-        mes = self.combo_mes.get()
-        visao = self.combo_visao.get()
-        return (
-            "TABELA:\n- CRMOV2 (Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- CRMovDta: Data da Operação\n- CRMov2CHor: Hora da Operação\n"
-            "- CRMov2VlrO: Valor Bruto da Venda\n- CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "REGRA DE NEGÓCIO:\n- Filtro inicial: CRMov2Flag IN ('A', 'F')\n"
-            "- Filtros Dinâmicos (Desta vez via Pandas): " + f"Ano={ano}, Mês={mes}, Visão={visao}"
-        )
-
-
     def criar_input(self, label, valor, show=None):
         ctk.CTkLabel(self, text=label, anchor="w").pack(fill="x", padx=30, pady=(10, 0))
         entry = ctk.CTkEntry(self, width=340, show=show); entry.pack(fill="x", padx=30, pady=(0, 5))
         if valor: entry.insert(0, valor)
         return entry
 
+    def copiar_id(self, texto):
+        self.clipboard_clear()
+        self.clipboard_append(texto)
+        self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
     def salvar(self):
-        self.update_callback({"nome_usuario": self.e_nome.get(), "servidor": self.e_servidor.get(), "banco": self.e_banco.get(), "usuario_bd": self.e_user.get(), "senha_bd": self.e_senha.get()})
+        new_cfg = {
+            "tabela": self.e_tabela.get(),
+            "col_id": self.e_id.get(),
+            "col_nome": self.e_nome.get(),
+            "col_cep": self.e_cep.get(),
+            "col_rua": self.e_rua.get(),
+            "col_logradouro": self.e_log.get(),
+            "col_bairro": self.e_bairro.get(),
+            "col_uf": self.e_uf.get()
+        }
+        self.update_callback(new_cfg)
+        self.destroy()
+
+class ConfigWindow(ctk.CTkToplevel):
+    def __init__(self, parent, config, update_callback):
+        super().__init__(parent)
+        self.grab_set()
+        self.title("⚙️ Configurações de Acesso")
+        
+        # Centraliza a tela
+        w, h = 480, 580
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
+        self.geometry(f"{w}x{h}+{x}+{y}")
+        
+        self.transient(parent)
+        self.update_callback = update_callback
+
+        # --- Título Superior ---
+        self.lbl_title = ctk.CTkLabel(self, text="🛠️ CONFIGURAÇÕES TÉCNICAS", font=ctk.CTkFont(size=20, weight="bold"), text_color="#1565C0")
+        self.lbl_title.pack(pady=(25, 20))
+
+        # --- Inputs ---
+        self.e_nome = self.criar_input("👤 Nome do Operador", config.get("nome_usuario", "Operador"))
+        self.e_servidor = self.criar_input("🖥️ Servidor SQL (SERVER\\INSTANCE)", config.get("servidor", ""))
+        self.e_banco = self.criar_input("🗄️ Nome do Banco de Dados", config.get("banco", ""))
+        self.e_user = self.criar_input("👤 Usuário do Banco (UID)", config.get("usuario_bd", "sa"))
+        self.e_senha = self.criar_input("🔑 Senha do Banco (PWD)", config.get("senha_bd", ""), show="*")
+
+        # --- Barra de Identificação de Tela ---
+        self.id_str = "CFG_ACESSO"
+        self.bottom_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=(0, 10))
+        
+        self.frame_id = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        self.frame_id.pack(side="right")
+        self.lbl_tela_id = ctk.CTkLabel(self.frame_id, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
+        self.lbl_tela_id.pack(side="left")
+        
+        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", command=self.acao_copiar_id)
+        self.btn_copy_id.pack(side="left", padx=5)
+        ToolTip(self.btn_copy_id, "COPIAR NOME TELA")
+
+        # --- Barra de Botões ---
+        self.buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.buttons_frame.pack(side="bottom", fill="x", padx=30, pady=(20, 15))
+        
+        ctk.CTkButton(self.buttons_frame, text="✖ Cancelar", width=140, height=35, fg_color="#C62828", hover_color="#B12020", command=self.destroy).pack(side="left")
+        ctk.CTkButton(self.buttons_frame, text="💾 Salvar Configurações", width=220, height=35, fg_color="#2E7D32", hover_color="#1B5E20", command=self.salvar).pack(side="right")
+
+    def criar_input(self, label, valor, show=None):
+        f = ctk.CTkFrame(self, fg_color="transparent")
+        f.pack(fill="x", padx=40, pady=5)
+        ctk.CTkLabel(f, text=label, font=("Arial", 12, "bold")).pack(anchor="w")
+        e = ctk.CTkEntry(f, width=380, height=35, show=show)
+        e.pack(pady=(2, 8)); e.insert(0, valor)
+        return e
+
+    def acao_copiar_id(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
+    def salvar(self):
+        new_config = {
+            "nome_usuario": self.e_nome.get(),
+            "servidor": self.e_servidor.get(),
+            "banco": self.e_banco.get(),
+            "usuario_bd": self.e_user.get(),
+            "senha_bd": self.e_senha.get()
+        }
+        self.update_callback(new_config)
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "Configurações atualizadas com sucesso!")
         self.destroy()
 
 class App(ctk.CTkFrame):
@@ -167,9 +231,9 @@ class App(ctk.CTkFrame):
         self.ceps_invalidos_cache = set()
         self.lista_updates = []
 
-        # Única Coluna no App
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
+        self.ultima_query_bruta = "" # Auditoria SQL
 
         # --- Top Frame (Menu Superior Expandido) Cor Chumbo ---
         self.top_frame = ctk.CTkFrame(self, fg_color="#D1D5DB", corner_radius=0)
@@ -285,7 +349,12 @@ class App(ctk.CTkFrame):
             border_color="black",
             command=self.fechar_tela
         )
-        self.btn_sair.pack(side="left", padx=(0, 15))
+        self.btn_sair.pack(side="left", padx=(0, 5))
+
+        # Botão de Auditoria SQL (?) - Padronizado
+        self.btn_debug_sql = ctk.CTkButton(self.bottom_frame, text="?", width=28, height=28, corner_radius=14, fg_color="#C62828", hover_color="#B12020", text_color="white", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=(0, 15))
+        ToolTip(self.btn_debug_sql, "VER COMANDO SQL BRUTO (Audit)")
 
         self.lbl_status = ctk.CTkLabel(self.bottom_frame, text="💡 Status: Pronto. Preencha a Busca e clique em Simular.", font=ctk.CTkFont(size=12))
         self.lbl_status.pack(side="left")
@@ -313,10 +382,68 @@ class App(ctk.CTkFrame):
         self.log("⚙️ Mapeamento de Tabela atualizado!")
 
     def copiar_id(self, texto):
-        self.clipboard_clear()
-        self.clipboard_append(texto)
-        self.update()
+        self.clipboard_clear(); self.clipboard_append(texto); self.update()
         messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
+    def get_current_query(self):
+        """Monta a query SQL dinamicamente com base nas configurações e busca atual."""
+        c = self.tabela_config
+        tabela = c["tabela"]
+        c_id = c["col_id"]
+        c_nome = c["col_nome"]
+        c_cep = c["col_cep"]
+        c_rua = c["col_rua"]
+        c_logradouro = c["col_logradouro"]
+        
+        busca = self.search_entry.get().strip()
+        where_clause = ""
+        if busca:
+            where_clause = f" WHERE {c_nome} LIKE '%{busca}%' OR {c_id} LIKE '%{busca}%'"
+
+        return f"""SELECT 
+    c.{c_id}, c.{c_nome}, c.{c_cep}, c.{c_rua}, 
+    c.{c['col_bairro']}, c.{c_logradouro},
+    m.CMUFCod as UF_Dinamica, m.CMCEPDes as Cidade_Dinamica, c.CMCEPCod  
+FROM {tabela} c
+LEFT JOIN CMCEP m ON c.CMCEPCod = m.CMCEPCod
+{where_clause}"""
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL Pronto/Executado em tempo real, centralizado com botão copiar."""
+        query = self.get_current_query()
+        
+        win = ctk.CTkToplevel(self)
+        win.title("AUDITORIA SQL (ATUALIZA_CEP)")
+        
+        # Centraliza a tela de debug
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        
+        win.transient(self); win.grab_set()
+        
+        lbl = ctk.CTkLabel(win, text="🔍 COMANDO SQL TÉCNICO", font=("Arial", 14, "bold"), text_color="#1565C0")
+        lbl.pack(pady=(20, 5))
+        
+        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
+        txt.pack(fill="both", expand=True, padx=20, pady=10)
+        txt.insert("0.0", query)
+        txt.configure(state="disabled")
+        
+        footer = ctk.CTkFrame(win, fg_color="transparent")
+        footer.pack(pady=(0, 20))
+        
+        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
+        btn_copy.pack(side="left", padx=10)
+        
+        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
+        btn_close.pack(side="right", padx=10)
+
+    def copiar_sql_debug(self, sql, window):
+        self.clipboard_clear(); self.clipboard_append(sql); self.update()
+        messagebox.showinfo("Clipboard", "SQL Copiado!", parent=window)
+        window.destroy()
 
     def log(self, mensagem):
         self.log_text.configure(state="normal")
@@ -388,27 +515,8 @@ class App(ctk.CTkFrame):
                 return
 
         cursor = conn.cursor()
-
-        # Condição de Busca (WHERE)
-        where_clause = ""
-        if busca:
-            where_clause = f" WHERE {c_nome} LIKE '%{busca}%' OR {c_id} LIKE '%{busca}%'"
-
-        query = f"""
-            SELECT 
-                c.{c_id}, 
-                c.{c_nome}, 
-                c.{c_cep}, 
-                c.{c_rua}, 
-                c.{c_bairro}, 
-                c.{c_logradouro},
-                m.CMUFCod as UF_Dinamica,
-                m.CMCEPDes as Cidade_Dinamica,  
-                c.CMCEPCod  
-            FROM {tabela} c
-            LEFT JOIN CMCEP m ON c.CMCEPCod = m.CMCEPCod
-            {where_clause}
-        """
+        query = self.get_current_query()
+        self.ultima_query_bruta = query # Rastro Técnico SQL (?)
         
         try:
             cursor.execute(query)
@@ -645,6 +753,7 @@ class AnaliseVendasWindow(ctk.CTkFrame):
     def __init__(self, parent, config):
         super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
         self.config = config
+        self.ultima_query_bruta = "" # Auditoria SQL
         
         # 1. Barra de Identificação de Tela
         self.bottom_bar = ctk.CTkFrame(self, fg_color="transparent")
@@ -655,7 +764,7 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         self.lbl_tela_id = ctk.CTkLabel(self.frame_id, text="Tela: ANALISE_VENDAS", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray")
         self.lbl_tela_id.pack(side="left")
         self.id_str = "ANALISE_VENDAS"
-        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", command=self.acao_copiar_e_sql)
+        self.btn_copy_id = ctk.CTkButton(self.frame_id, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", command=self.acao_copiar_id)
         self.btn_copy_id.pack(side="left", padx=5)
         ToolTip(self.btn_copy_id, "COPIAR NOME TELA")
 
@@ -683,7 +792,11 @@ class AnaliseVendasWindow(ctk.CTkFrame):
             border_color="black",
             command=self.fechar_tela
         )
-        self.btn_sair.pack(side="left")
+        self.btn_sair.pack(side="left", padx=(0, 5))
+
+        self.btn_debug_sql = ctk.CTkButton(self.buttons_frame, text="?", width=28, height=28, corner_radius=14, fg_color="#C62828", hover_color="#B12020", text_color="white", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=(0, 15))
+        ToolTip(self.btn_debug_sql, "VER COMANDO SQL BRUTO (Audit)")
 
         # Exportações
         self.btn_export_pdf = ctk.CTkButton(self.buttons_frame, text="📄 Exportar PDF", width=140, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
@@ -747,17 +860,62 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         self.df_grouped = None
         self.after(100, self.carregar_dados)
 
-    def acao_copiar_e_sql(self):
-        try:
-            self.clipboard_clear()
-            self.clipboard_append(self.id_str)
-            summary = self.get_sql_summary()
-            msg = f"NOME DA TELA COPIADO: {self.id_str}\n\n--- ESTRUTURA SQL (RESUMO) ---\n{summary}"
-            from tkinter import messagebox
-            messagebox.showinfo("Informação do Sistema", msg)
-        except Exception as e:
-            from tkinter import messagebox
-            messagebox.showerror("Erro", f"Erro ao processar comando: {e}")
+    def acao_copiar_id(self):
+        """Copia apenas o identificador da tela para o clipboard."""
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        self.update()
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL dinâmico completo, centralizado com botão copiar."""
+        query = self.get_current_query()
+        
+        win = ctk.CTkToplevel(self)
+        win.title("AUDITORIA SQL: Vendas por Hora")
+        
+        # Centraliza a tela de debug
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        win.transient(self); win.grab_set()
+        
+        lbl = ctk.CTkLabel(win, text="📈 COMANDO TÉCNICO FILTRADO (WHERE)", font=("Arial", 14, "bold"), text_color="#1565C0")
+        lbl.pack(pady=(20, 5))
+        
+        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
+        txt.pack(fill="both", expand=True, padx=20, pady=10)
+        txt.insert("0.0", query)
+        txt.configure(state="disabled")
+        
+        footer = ctk.CTkFrame(win, fg_color="transparent")
+        footer.pack(pady=(0, 20))
+        
+        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
+        btn_copy.pack(side="left", padx=10)
+        
+        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
+        btn_close.pack(side="right", padx=10)
+
+    def copiar_sql_debug(self, sql, window):
+        self.clipboard_clear(); self.clipboard_append(sql); self.update()
+        messagebox.showinfo("Clipboard", "SQL Copiado!", parent=window)
+        window.destroy()
+
+    def get_current_query(self):
+        """Monta a query SQL refletindo os filtros reais de Ano e Mês da tela."""
+        ano_sel = self.combo_ano.get()
+        mes_sel = self.combo_mes.get()
+        where_extra = ""
+        
+        if ano_sel != "Todos":
+            where_extra += f" AND YEAR(CRMovDta) = {ano_sel}"
+        if mes_sel != "Todos":
+            mes_idx = self.combo_mes.get().split(" - ")[0]
+            where_extra += f" AND MONTH(CRMovDta) = {mes_idx}"
+            
+        return f"SELECT CRMovDta, CRMov2CHor, CRMov2VlrO FROM crmov2 WHERE CRMovDta IS NOT NULL AND CRMov2Flag IN ('A', 'F'){where_extra} ORDER BY CRMovDta"
 
     def get_sql_summary(self):
         ano = self.combo_ano.get()
@@ -777,6 +935,7 @@ class AnaliseVendasWindow(ctk.CTkFrame):
             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config['servidor']};DATABASE={self.config['banco']};UID={self.config['usuario_bd']};PWD={self.config['senha_bd']}"
             conn = pyodbc.connect(conn_str)
             query = "SELECT CRMovDta, CRMov2CHor, CRMov2VlrO FROM crmov2 WHERE CRMovDta IS NOT NULL AND CRMov2Flag IN ('A', 'F')"
+            self.ultima_query_bruta = query # Rastro Técnico SQL (?)
             self.df_raw = pd.read_sql(query, conn)
             conn.close()
             
@@ -1041,6 +1200,7 @@ class MainHub(ctk.CTk):
         ctk.set_appearance_mode("Light")
         
         self.config = {"nome_usuario": "Operador", "servidor": r"servidor\sqlexpress", "banco": "msinfor", "usuario_bd": "sa", "senha_bd": "Mabelu2011"}
+        self.carregar_config()
         self.grid_rowconfigure(0, weight=1); self.grid_columnconfigure(1, weight=1)
 
         # Sidebar (Faixa Azul Escura conforme imagem)
@@ -1140,7 +1300,7 @@ class MainHub(ctk.CTk):
         self.btn_resumo_cli = ctk.CTkButton(self.col1_frame, text="🛍️ Análise Compras por Cliente", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_resumo_cliente, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_resumo_cli.pack(pady=8, padx=15)
 
-        self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Inativos", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_pararam = ctk.CTkButton(self.col1_frame, text="🛑 Clientes Deixaram de Comprar", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_clientes_pararam, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_pararam.pack(pady=8, padx=15)
 
         self.btn_contas = ctk.CTkButton(self.col1_frame, text="💰 Resumo por Tipo Venda", width=btn_width, height=45, font=("Arial", 13, "bold"), command=self.abrir_posicao_contas, fg_color="#1E88E5", hover_color="#1565C0")
@@ -1345,8 +1505,32 @@ class MainHub(ctk.CTk):
     def atualizar_rodape(self):
         self.lbl_footer.configure(text=f"👤 {self.config['nome_usuario']}  |  🖥️ {self.config['servidor']}  |  🗄️ {self.config['banco']}")
 
+    def carregar_config(self):
+        """Carrega configurações do arquivo json se existir."""
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    saved_config = json.load(f)
+                    self.config.update(saved_config)
+                    print(f"DEBUG: Configurações carregadas de {config_path}")
+            except Exception as e:
+                print(f"DEBUG: Erro ao carregar config.json: {e}")
+
+    def salvar_config_persistente(self, nova_config):
+        """Salva configurações no arquivo json e atualiza o estado atual."""
+        self.config = nova_config
+        self.atualizar_rodape()
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+                print(f"DEBUG: Configurações salvas em {config_path}")
+        except Exception as e:
+            print(f"DEBUG: Erro ao salvar config.json: {e}")
+
     def abrir_configuracoes(self): 
-        ConfigWindow(self, self.config, lambda c: [setattr(self, 'config', c), self.atualizar_rodape()])
+        ConfigWindow(self, self.config, self.salvar_config_persistente)
 
     def fechar_modulo_atual(self):
         if hasattr(self, 'modulo_atual') and self.modulo_atual:
@@ -1412,6 +1596,16 @@ class MainHub(ctk.CTk):
     def abrir_tabela_posto(self, key):
         config_tabela = POSTO_TABLES_CONFIG.get(key)
         if config_tabela:
+            # Roteamento Especializado: POENF utiliza tela customizada com filtros avançados
+            if key == "POENF":
+                # Abrir com flag de retorno ao posto habilitada
+                def instanciador_nf(parent, config):
+                    win = EntradaNFPostoWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_nf)
+                return
+
             # Custom load logic for the generic window
             def instanciador(parent, config):
                 win = TabelaPostoWindow(parent, config, config_tabela)
@@ -1441,7 +1635,7 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
         
 
         # Título
-        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: Concentrador x Vendas", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
+        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: CRMov2 x POCF1", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
         
         # Filtros de Data
         from datetime import datetime, date
@@ -1450,7 +1644,7 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
         fim_mes = hoje.strftime("%d/%m/%Y")
         
         filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        filter_frame.pack(side="right", padx=20, pady=10)
+        filter_frame.pack(side="left", padx=20, pady=10)
         
         ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
         self.ent_de = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
@@ -1479,20 +1673,24 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
         style.configure("Conciliacao.Treeview.Heading", background="#0D47A1", foreground="#FFFFFF", font=("Arial", 12, "bold"), relief="flat")
         style.map("Conciliacao.Treeview.Heading", background=[('active', '#1565C0')]) # Hover effect
         
-        self.tree = ttk.Treeview(self.grid_container, style="Conciliacao.Treeview", columns=("data", "seq", "item", "pro", "des", "qtd", "vlr", "status"), show="headings")
+        self.tree = ttk.Treeview(self.grid_container, style="Conciliacao.Treeview", columns=("data", "seq", "item", "cli_id", "cli_nome", "pro", "des", "qtd", "vlr", "status"), show="headings")
         self.tree.pack(fill="both", expand=True)
         
         headings = [
-            ("data", "📅 Data"), ("seq", "🔢 Sequência"), ("item", "📦 Item"), 
-            ("pro", "🏷️ Produto"), ("des", "📝 Descrição"), 
-            ("qtd", "📊 Quantidade"), ("vlr", "💰 Preço"), ("status", "📢 Divergência")
+            ("data", "📅 Data"), ("seq", "🔢 Seq."), ("item", "📦 Item"), 
+            ("cli_id", "👤 Cli. ID"), ("cli_nome", "🏢 Cliente"),
+            ("pro", "🏷️ Cod."), ("des", "📝 Descrição Produto"), 
+            ("qtd", "📊 Qtd."), ("vlr", "💰 Preço"), ("status", "📢 Divergência")
         ]
         for col, head in headings:
             self.tree.heading(col, text=head)
             w = 100
-            if col == "des": w = 250
-            elif col == "status": w = 350
-            self.tree.column(col, anchor="center" if col not in ["des", "status"] else "w", width=w)
+            if col == "cli_id": w = 80
+            elif col == "cli_nome": w = 180
+            elif col == "des": w = 220
+            elif col == "status": w = 300
+            elif col in ["data", "seq", "item", "pro"]: w = 80
+            self.tree.column(col, anchor="center" if col not in ["des", "status", "cli_nome"] else "w", width=w)
         
         # Totalizador de Registros (Summary)
         self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
@@ -1513,6 +1711,8 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
         id_frame.pack(side="right")
         
         ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
+        self.btn_debug_sql = ctk.CTkButton(id_frame, text="?", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="#1565C0", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=2)
         ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
                      command=self.copiar_id_tela).pack(side="left", padx=5)
 
@@ -1524,9 +1724,113 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
             self.hub.abrir_posto()
 
     def copiar_id_tela(self):
-        self.clipboard_clear()
-        self.clipboard_append(self.id_str)
-        messagebox.showinfo("Copiado", f"ID da tela copiado: {self.id_str}")
+        self.clipboard_clear(); self.clipboard_append(self.id_str); self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
+    def get_current_query(self):
+        """Monta o SQL real de auditoria fiscal cruzada (CRMov x POCF1) com filtros de data atuais."""
+        posto_id = self.config_db.get("id_posto", "1")
+        de = self.ent_de.get().strip()
+        ate = self.ent_ate.get().strip()
+        
+        return f"""SELECT 
+    c2.CRMovDta, c2.CRMovSeq, c4.CRMov4Ite, c2.CRMov2CodC, c2.CRMov2DesC, 
+    c4.CEProCod, p.CEProDes, c4.CRMov4Qtd, c4.CRMov4VlrA,
+    (SELECT COUNT(*) FROM POCF1 s 
+     WHERE s.POEmpCod = c2.CMEmpCod 
+     AND s.POCF1DtaMo = c2.CRMovDta 
+     AND s.POCF1SeqMo = c2.CRMovSeq 
+     AND s.POCF1IteMo = c4.CRMov4Ite) as QtdVendas
+FROM CRMov2 c2
+JOIN CRMov4 c4 ON c2.CMEmpCod = c4.CMEmpCod AND c2.CRMovDta = c4.CRMovDta AND c2.CRMovSeq = c4.CRMovSeq
+LEFT JOIN CEPro p ON p.CEProCod = c4.CEProCod
+WHERE c2.CMEmpCod = '{posto_id}' 
+AND CAST(c2.CRMovDta AS DATE) BETWEEN '{de}' AND '{ate}'
+AND c4.CEProCod < 10
+AND (
+    NOT EXISTS (SELECT 1 FROM POCF1 s 
+                WHERE s.POEmpCod = c2.CMEmpCod 
+                AND s.POCF1DtaMo = c2.CRMovDta 
+                AND s.POCF1SeqMo = c2.CRMovSeq 
+                AND s.POCF1IteMo = c4.CRMov4Ite)
+    OR 
+    (SELECT COUNT(*) FROM POCF1 s 
+     WHERE s.POEmpCod = c2.CMEmpCod 
+     AND s.POCF1DtaMo = c2.CRMovDta 
+     AND s.POCF1SeqMo = c2.CRMovSeq 
+     AND s.POCF1IteMo = c4.CRMov4Ite) > 1
+)
+ORDER BY c2.CRMovDta DESC"""
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL técnico detalhado para suporte."""
+        query = self.get_current_query()
+        win = ctk.CTkToplevel(self); win.title(f"AUDITORIA SQL ({self.id_str})")
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}"); win.transient(self); win.grab_set()
+        
+        ctk.CTkLabel(win, text="🔍 COMANDO TÉCNICO DE CONCILIAÇÃO", font=("Arial", 14, "bold"), text_color="#1565C0").pack(pady=15)
+        txt = ctk.CTkTextbox(win, font=("Consolas", 12)); txt.pack(fill="both", expand=True, padx=20, pady=10)
+        txt.insert("1.0", query)
+        
+        ctk.CTkButton(win, text="📋 COPIAR SQL", font=("Arial", 13, "bold"), fg_color="#2E7D32", hover_color="#1B5E20",
+                     command=lambda: self.copiar_sql_debug(query)).pack(pady=15)
+
+    def copiar_sql_debug(self, sql):
+        self.clipboard_clear(); self.clipboard_append(sql); self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "COMANDO SQL COPIADO PARA O CLIPBOARD")
+
+    def get_sql_summary(self):
+        de_raw = self.ent_de.get().strip()
+        ate_raw = self.ent_ate.get().strip()
+        
+        return (
+            "--- ESTRUTURA SQL (RESUMO) ---\n"
+            "TABELAS:\n"
+            "- CRMOV2 c2 (Cabeçalho de Vendas do Concentrador)\n"
+            "- CRMOV4 c4 (Itens de Venda do Concentrador)\n"
+            "- POCF1 s (Movimentos de Caixa/Vendas SIL)\n"
+            "- CEPRO p (Cadastro de Produtos)\n\n"
+            
+            "CAMPOS UTILIZADOS:\n"
+            "- c2.CRMovDta / c2.CRMovSeq: Chave Primária de Venda\n"
+            "- c4.CRMov4Ite: Sequencial do Bico/Item\n"
+            "- c4.CEProCod: Código do Produto (Combustível/Diversos)\n"
+            "- p.CEProDes: Descrição do Produto\n"
+            "- c4.CRMov4Qtd: Quantidade Lida do Concentrador\n"
+            "- c4.CRMov4VlrA: Preço Unitário de Tabela\n\n"
+            
+            "FILTRO ATUAL (WHERE):\n"
+            f"  c2.CMEmpCod = (Posto Selecionado)\n"
+            f"  AND CAST(c2.CRMovDta AS DATE) BETWEEN '{de_raw}' AND '{ate_raw}'\n"
+            "  AND (\n"
+            "      -- DETECTA REGISTROS NÃO LANÇADOS (BATIMENTO TÉCNICO):\n"
+            "      -- POEmpCod   = CMEmpCod\n"
+            "      -- POCF1DtaMo = CRMovDta\n"
+            "      -- POCF1SeqMo = CRMovSeq\n"
+            "      -- POCF1IteMo = CRMov4Ite\n"
+            "      NOT EXISTS (SELECT 1 FROM POCF1 s \n"
+            "          WHERE s.POEmpCod = c2.CMEmpCod \n"
+            "            AND s.POCF1DtaMo = c2.CRMovDta \n"
+            "            AND s.POCF1SeqMo = c2.CRMovSeq \n"
+            "            AND s.POCF1IteMo = c4.CRMov4Ite)\n"
+            "      OR \n"
+            "      -- DETECTA REGISTROS REPLICADOS/DUPLICADOS\n"
+            "      (SELECT COUNT(*) FROM POCF1 s2 \n"
+            "          WHERE s2.POEmpCod = c2.CMEmpCod \n"
+            "            AND s2.POCF1DtaMo = c2.CRMovDta \n"
+            "            AND s2.POCF1SeqMo = c2.CRMovSeq \n"
+            "            AND s2.POCF1IteMo = c4.CRMov4Ite) > 1\n"
+            "  )\n\n"
+            
+            "REGRA DE AUDITORIA:\n"
+            "  Batimento cruzado entre CRMov4 e POCF1 usando:\n"
+            "  Empresa, Data, Sequência e Item."
+        )
 
     def abrir_calendario(self, entry_target):
         # Implementação de um seletor de data dinâmico (Pop-up)
@@ -1626,6 +1930,8 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
                     c2.CRMovDta, 
                     c2.CRMovSeq, 
                     c4.CRMov4Ite, 
+                    c2.CRMov2CodC as CliID,
+                    c2.CRMov2DesC as CliNome,
                     c4.CEProCod as ProCod,
                     COALESCE(p.CEProDes, 'N/D') as ProDes,
                     COALESCE(c4.CRMov4Qtd, 0) as Qtd,
@@ -1636,10 +1942,11 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
                      AND s.POCF1SeqMo = c2.CRMovSeq 
                      AND s.POCF1IteMo = c4.CRMov4Ite) as QtdVendas
                 FROM CRMov2 c2
-                JOIN CRMov4 c4 ON c2.CMEmpCod = c4.CMEmpCod AND c2.CRMovSeq = c4.CRMovSeq
+                JOIN CRMov4 c4 ON c2.CMEmpCod = c4.CMEmpCod AND c2.CRMovDta = c4.CRMovDta AND c2.CRMovSeq = c4.CRMovSeq
                 LEFT JOIN CEPro p ON p.CEProCod = c4.CEProCod
                 WHERE c2.CMEmpCod = ? 
                 AND CAST(c2.CRMovDta AS DATE) BETWEEN ? AND ?
+                AND c4.CEProCod < 10
                 AND (
                     NOT EXISTS (SELECT 1 FROM POCF1 s 
                                 WHERE s.POEmpCod = c2.CMEmpCod 
@@ -1676,13 +1983,13 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
             
             total_regs = len(rows)
             for i, row in enumerate(rows):
-                # row[0]:Dta, row[1]:Seq, row[2]:Ite, row[3]:CodPro, row[4]:Des, row[5]:Qtd, row[6]:Preco, row[7]:QtdVendas
-                status = "❌ NÃO LANÇADO (POCF1)" if row[7] == 0 else f"⚠️ REPLICADO {row[7]}X"
+                # row[0]:Dta, row[1]:Seq, row[2]:Ite, row[3]:CliID, row[4]:CliNom, row[5]:CodPro, row[6]:DesPro, row[7]:Qtd, row[8]:Preco, row[9]:QtdVendas
+                status = "❌ NÃO LANÇADO (POCF1)" if row[9] == 0 else f"⚠️ REPLICADO {row[9]}X"
                 v_data = row[0].strftime("%d/%m/%Y") if hasattr(row[0], "strftime") else str(row[0])
                 
                 self.tree.insert("", "end", values=(
-                    v_data, row[1], row[2], row[3], row[4], 
-                    f"{row[5]:.2f}", f"R$ {row[6]:.2f}", status
+                    v_data, row[1], row[2], row[3], str(row[4]).strip().upper(), 
+                    row[5], row[6], f"{row[7]:.2f}", f"R$ {row[8]:.2f}", status
                 ))
                 
                 # Atualizar progresso centralizado e Barra
@@ -1706,6 +2013,477 @@ class ConciliacaoConcentradorVendasWindow(ctk.CTkFrame):
             
         except Exception as e:
             messagebox.showerror("Erro Conciliação", f"Falha ao cruzar dados:\n\n{str(e)}")
+
+class ConciliacaoPOCF4Window(ctk.CTkFrame):
+    def __init__(self, parent, config):
+        super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
+        self.config_db = config
+        self.hub = parent
+        self.id_str = "CONCILIACAO_POCF4_POCF1"
+
+        # --- FRAME SUPERIOR (Filtros) ---
+        self.top_frame = ctk.CTkFrame(self, fg_color="#F1F5F9", corner_radius=0)
+        self.top_frame.pack(side="top", fill="x")
+
+        # Título
+        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: POCF4 x POCF1", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
+        
+        # Filtros de Data
+        from datetime import datetime, date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+        
+        filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        filter_frame.pack(side="right", padx=20, pady=10)
+        
+        ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=30, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(filter_frame, text="Até:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_ate = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=30, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+        
+        self.btn_filtrar = ctk.CTkButton(filter_frame, text="🔎 Conciliar", width=120, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#0D47A1", hover_color="#1565C0", command=self.carregar_divergencias)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        # --- GRID (TREEVIEW) ---
+        self.grid_container = ctk.CTkFrame(self, fg_color="white")
+        self.grid_container.pack(fill="both", expand=True, padx=20, pady=(5, 0))
+        
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("POCF4.Treeview", rowheight=35, font=("Arial", 11), background="#FFFFFF", fieldbackground="#FFFFFF", borderwidth=0)
+        style.configure("POCF4.Treeview.Heading", background="#0D47A1", foreground="#FFFFFF", font=("Arial", 12, "bold"), relief="flat")
+        style.map("POCF4.Treeview.Heading", background=[('active', '#1565C0')])
+
+        self.tree = ttk.Treeview(self.grid_container, style="POCF4.Treeview", columns=("data", "tst", "regis", "des", "qtd", "vlr", "status"), show="headings")
+        self.tree.pack(fill="both", expand=True)
+        
+        headings = [
+            ("data", "📅 Data"), ("tst", "🔢 Tst"), ("regis", "📋 Registro"), 
+            ("des", "📝 Descrição Item"), ("qtd", "📊 Qtd."), ("vlr", "💰 Valor"), ("status", "📢 Divergência")
+        ]
+        for col, head in headings:
+            self.tree.heading(col, text=head)
+            w = 100
+            if col == "des": w = 300
+            elif col == "status": w = 300
+            elif col in ["tst", "regis"]: w = 90
+            self.tree.column(col, anchor="center" if col not in ["des", "status"] else "w", width=w)
+        
+        # Summary
+        self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
+        self.summary_frame.pack(fill="x", padx=20)
+        self.lbl_total = ctk.CTkLabel(self.summary_frame, text="Total de Divergências: 0 registros", font=("Arial", 13, "bold"), text_color="#1E293B")
+        self.lbl_total.pack(side="right", padx=20)
+
+        # Barra de Status Persistente
+        self.status_bar = ctk.CTkFrame(self, height=25, fg_color="#E2E8F0", corner_radius=0)
+        self.status_bar.pack(side="bottom", fill="x")
+        self.lbl_status = ctk.CTkLabel(self.status_bar, text="🟢 Sistema Pronto", font=("Arial", 11), text_color="#64748B")
+        self.lbl_status.pack(side="left", padx=20)
+
+        # Barra inferior de botões
+        self.bottom_bar = ctk.CTkFrame(self, height=30, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=5)
+        
+        self.btn_voltar = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
+                                       fg_color="transparent", border_width=2, border_color="black", text_color="black", 
+                                       hover_color="#E0E0E0", font=("Arial", 12, "bold"))
+        self.btn_voltar.pack(side="left")
+        
+        id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        id_frame.pack(side="right")
+        
+        ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
+        self.btn_debug_sql = ctk.CTkButton(id_frame, text="?", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="#1565C0", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=2)
+        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
+                     command=self.copiar_id_tela).pack(side="left", padx=5)
+
+        self.after(500, self.carregar_divergencias)
+
+    def voltar(self): 
+        if hasattr(self, 'hub') and self.hub: self.hub.abrir_posto()
+
+    def copiar_id_tela(self):
+        resumo = self.get_sql_summary()
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        messagebox.showinfo("Informação do Sistema", f"NOME DA TELA COPIADO: {self.id_str}\n\n{resumo}")
+
+    def get_sql_summary(self):
+        de_raw = self.ent_de.get().strip()
+        ate_raw = self.ent_ate.get().strip()
+        return (
+            "--- ESTRUTURA SQL (AUDITORIA POCF4 x POCF1) ---\n"
+            "ORIGEM: POCF4 (Itens de Caixa/Frentista)\n"
+            "DESTINO: POCF1 (Registros de Caixa Consolidados)\n\n"
+            "CHAVES DE BATIMENTO:\n"
+            "- Empresa (POEmpCod)\n"
+            "- Teste (POCF4Tst = POCF1Tst)\n"
+            "- Registro (POCF4Regis = POCF1Regis)\n\n"
+            "FILTRO:\n"
+            f"  Data entre '{de_raw}' e '{ate_raw}'"
+        )
+
+    def abrir_calendario(self, entry_target):
+        pop = ctk.CTkToplevel(self)
+        pop.title("📅 Selecionar Data")
+        pop.geometry("320x400")
+        pop.attributes("-topmost", True)
+        pop.grab_set()
+        from datetime import date
+        import calendar
+        hoje = date.today()
+        cal_state = {"mes": hoje.month, "ano": hoje.year}
+        main_f = ctk.CTkFrame(pop, fg_color="white")
+        main_f.pack(fill="both", expand=True, padx=10, pady=10)
+        header_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        header_f.pack(fill="x", pady=5)
+        lbl_mes_ano = ctk.CTkLabel(header_f, text="", font=("Arial", 14, "bold"), text_color="#1E88E5")
+        def update_view():
+            mes, ano = cal_state["mes"], cal_state["ano"]
+            nome_mes = ["?", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][mes]
+            lbl_mes_ano.configure(text=f"{nome_mes} {ano}")
+            for widget in grid_f.winfo_children():
+                if int(widget.grid_info()["row"]) > 0: widget.destroy()
+            cal = calendar.monthcalendar(ano, mes)
+            for r, week in enumerate(cal):
+                for c, day in enumerate(week):
+                    if day != 0:
+                        btn = ctk.CTkButton(grid_f, text=str(day), width=35, height=35, fg_color="#F1F5F9", text_color="black", hover_color="#CBD5E1", command=lambda d=day: set_date(d))
+                        btn.grid(row=r+1, column=c, padx=2, pady=2)
+        def mudar_mes(inc):
+            cal_state["mes"] += inc
+            if cal_state["mes"] > 12: cal_state["mes"] = 1; cal_state["ano"] += 1
+            elif cal_state["mes"] < 1: cal_state["mes"] = 12; cal_state["ano"] -= 1
+            update_view()
+        ctk.CTkButton(header_f, text="◀", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(-1)).pack(side="left", padx=10)
+        lbl_mes_ano.pack(side="left", expand=True)
+        ctk.CTkButton(header_f, text="▶", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(1)).pack(side="right", padx=10)
+        grid_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        grid_f.pack(fill="both", expand=True)
+        dias_sem = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"]
+        for i, ds in enumerate(dias_sem): ctk.CTkLabel(grid_f, text=ds, font=("Arial", 10, "bold"), text_color="gray").grid(row=0, column=i, pady=5)
+        def set_date(dia):
+            entry_target.delete(0, "end"); entry_target.insert(0, f"{dia:02d}/{cal_state['mes']:02d}/{cal_state['ano']}")
+            pop.destroy()
+        update_view()
+
+    def carregar_divergencias(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            for i in self.tree.get_children(): self.tree.delete(i)
+            de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+            if not de_raw or not ate_raw: return
+            de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, "hub") and self.hub else 1
+            
+            sql = f"""
+                SELECT 
+                    f4.POCF4DtaMo, 
+                    f4.POCF4Tst, 
+                    f4.POCF4Regis, 
+                    f4.POCF4ProDe, 
+                    f4.POCF4VlrMo, 
+                    f4.POCF4Qtd,
+                    (SELECT COUNT(*) FROM POCF1 f1 
+                     WHERE f1.POEmpCod = f4.POEmpCod 
+                     AND f1.POCF1Tst = f4.POCF4Tst 
+                     AND f1.POCF1Regis = f4.POCF4Regis) as QtdVendas
+                FROM POCF4 f4
+                WHERE f4.POEmpCod = ? 
+                AND CAST(f4.POCF4DtaMo AS DATE) BETWEEN ? AND ?
+                AND (
+                    NOT EXISTS (SELECT 1 FROM POCF1 f1 
+                                WHERE f1.POEmpCod = f4.POEmpCod 
+                                AND f1.POCF1Tst = f4.POCF4Tst 
+                                AND f1.POCF1Regis = f4.POCF4Regis)
+                    OR 
+                    (SELECT COUNT(*) FROM POCF1 f1 
+                     WHERE f1.POEmpCod = f4.POEmpCod 
+                     AND f1.POCF1Tst = f4.POCF4Tst 
+                     AND f1.POCF1Regis = f4.POCF4Regis) > 1
+                )
+                ORDER BY f4.POCF4DtaMo DESC
+            """
+            self.overlay_prog = ctk.CTkFrame(self, fg_color="white", border_width=2, border_color="#1E88E5", corner_radius=15)
+            self.overlay_prog.place(relx=0.5, rely=0.5, anchor="center")
+            ctk.CTkLabel(self.overlay_prog, text="🚀 AUDITORIA POCF4 X POCF1", font=("Arial", 14, "bold"), text_color="#1E293B").pack(padx=30, pady=(20, 5))
+            self.p_bar = ctk.CTkProgressBar(self.overlay_prog, width=300, height=12, corner_radius=10, fg_color="#E2E8F0", progress_color="#1E88E5")
+            self.p_bar.pack(padx=30, pady=10); self.p_bar.set(0)
+            self.lbl_prog_val = ctk.CTkLabel(self.overlay_prog, text="⏳ Cruzando registros...", font=("Arial", 12), text_color="#1E88E5")
+            self.lbl_prog_val.pack(pady=(0, 20))
+            self.lbl_status.configure(text="⚙️ Consultando Banco de Dados...", text_color="#1E88E5")
+            self.update()
+
+            cur.execute(sql, (posto_id, de, ate))
+            rows = cur.fetchall()
+            total_regs = len(rows)
+            for i, row in enumerate(rows):
+                status = "❌ NÃO LANÇADO (POCF1)" if row[6] == 0 else f"⚠️ REPLICADO {row[6]}X"
+                v_data = row[0].strftime("%d/%m/%Y") if hasattr(row[0], "strftime") else str(row[0])
+                self.tree.insert("", "end", values=(v_data, row[1], row[2], str(row[3]).strip().upper(), f"{row[5]:.2f}", f"R$ {row[4]:.2f}", status))
+                if (i + 1) % 50 == 0 or (i + 1) == total_regs:
+                    msg = f"⚙️ Processando: {i+1} de {total_regs}..."
+                    self.lbl_prog_val.configure(text=msg)
+                    self.lbl_status.configure(text=f"⏳ {msg}")
+                    self.p_bar.set((i + 1) / total_regs); self.update()
+            
+            conn.close(); self.overlay_prog.destroy()
+            self.lbl_total.configure(text=f"📊 Total de Divergências: {total_regs} registros")
+            self.lbl_status.configure(text="🟢 Processamento Concluído", text_color="#10B981")
+            
+            if total_regs == 0:
+                messagebox.showinfo("Sucesso Conciliação", "✅ Nenhuma divergência encontrada!\n\nTodos os registros da POCF4 foram localizados corretamente na POCF1 para o período selecionado.")
+            
+            for i, child in enumerate(self.tree.get_children()):
+                tag = "even" if i % 2 == 0 else "odd"
+                self.tree.item(child, tags=(tag,))
+            self.tree.tag_configure("even", background="#FFFFFF"); self.tree.tag_configure("odd", background="#E2E8F0")
+        except Exception as e: messagebox.showerror("Erro Conciliação", str(e))
+
+class ConciliacaoPOCF1CRMOV4Window(ctk.CTkFrame):
+    def __init__(self, parent, config):
+        super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
+        self.config_db = config
+        self.hub = parent
+        self.id_str = "CONCILIACAO_POCF1_CRMOV4"
+
+        # --- FRAME SUPERIOR (Filtros) ---
+        self.top_frame = ctk.CTkFrame(self, fg_color="#F1F5F9", corner_radius=0)
+        self.top_frame.pack(side="top", fill="x")
+
+        # Título
+        ctk.CTkLabel(self.top_frame, text="🎯 Auditoria: POCF1 x CRMov4", font=("Arial", 18, "bold"), text_color="#1E293B").pack(side="left", padx=20, pady=10)
+        
+        # Filtros de Data (por POCF1Tst)
+        from datetime import datetime, date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+        
+        filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        filter_frame.pack(side="right", padx=20, pady=10)
+        
+        ctk.CTkLabel(filter_frame, text="Período Teste:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        ctk.CTkLabel(filter_frame, text="De:", font=("Arial", 10), text_color="#64748B").pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(filter_frame, text="Até:", font=("Arial", 10), text_color="#64748B").pack(side="left", padx=2)
+        self.ent_ate = ctk.CTkEntry(filter_frame, width=90, height=32); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+        
+        self.btn_filtrar = ctk.CTkButton(filter_frame, text="🔎 Conciliar", width=110, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#0D47A1", hover_color="#1565C0", command=self.carregar_divergencias)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        # --- GRID (TREEVIEW) ---
+        self.grid_container = ctk.CTkFrame(self, fg_color="white")
+        self.grid_container.pack(fill="both", expand=True, padx=20, pady=(5, 0))
+        
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("POCF1.Treeview", rowheight=35, font=("Arial", 11), background="#FFFFFF", fieldbackground="#FFFFFF", borderwidth=0)
+        style.configure("POCF1.Treeview.Heading", background="#0D47A1", foreground="#FFFFFF", font=("Arial", 12, "bold"), relief="flat")
+        style.map("POCF1.Treeview.Heading", background=[('active', '#1565C0')])
+
+        self.tree = ttk.Treeview(self.grid_container, style="POCF1.Treeview", columns=("data", "seq", "item", "regis", "prode", "obs", "vlr", "status"), show="headings")
+        self.tree.pack(fill="both", expand=True)
+        
+        headings = [
+            ("data", "📅 Data Mov."), ("seq", "🔢 Seq."), ("item", "📦 Item"), 
+            ("regis", "📋 Registro"), ("prode", "🏷️ Produto"), ("obs", "📝 Obs."), ("vlr", "💰 Valor Bruto"), ("status", "📢 Divergência")
+        ]
+        for col, head in headings:
+            self.tree.heading(col, text=head)
+            w = 100
+            if col == "prode": w = 200
+            elif col == "obs": w = 180
+            elif col == "status": w = 250
+            elif col in ["seq", "item", "regis"]: w = 70
+            self.tree.column(col, anchor="center" if col not in ["prode", "obs", "status"] else "w", width=w)
+        
+        self.summary_frame = ctk.CTkFrame(self, height=35, fg_color="#F1F5F9", corner_radius=0)
+        self.summary_frame.pack(fill="x", padx=20)
+        self.lbl_total = ctk.CTkLabel(self.summary_frame, text="Total de Divergências: 0 registros", font=("Arial", 13, "bold"), text_color="#1E293B")
+        self.lbl_total.pack(side="right", padx=20)
+
+        self.status_bar = ctk.CTkFrame(self, height=25, fg_color="#E2E8F0", corner_radius=0)
+        self.status_bar.pack(side="bottom", fill="x")
+        self.lbl_status = ctk.CTkLabel(self.status_bar, text="🟢 Sistema Pronto", font=("Arial", 11), text_color="#64748B")
+        self.lbl_status.pack(side="left", padx=20)
+
+        self.bottom_bar = ctk.CTkFrame(self, height=30, fg_color="transparent")
+        self.bottom_bar.pack(side="bottom", fill="x", padx=20, pady=5)
+        
+        ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", width=140, height=35, command=self.voltar, 
+                      fg_color="transparent", border_width=2, border_color="black", text_color="black", 
+                      hover_color="#E0E0E0", font=("Arial", 12, "bold")).pack(side="left")
+        
+        id_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        id_frame.pack(side="right")
+        ctk.CTkLabel(id_frame, text=f"Tela: {self.id_str}", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray").pack(side="left")
+        self.btn_debug_sql = ctk.CTkButton(id_frame, text="?", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="#1565C0", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=2)
+        ctk.CTkButton(id_frame, text="📋", width=20, height=20, fg_color="transparent", hover_color="#E0E0E0", text_color="black", 
+                     command=self.copiar_id_tela).pack(side="left", padx=5)
+
+        self.after(500, self.carregar_divergencias)
+
+    def voltar(self): 
+        if hasattr(self, 'hub') and self.hub: self.hub.abrir_posto()
+
+    def copiar_id_tela(self):
+        resumo = self.get_sql_summary()
+        self.clipboard_clear(); self.clipboard_append(self.id_str)
+        messagebox.showinfo("Informação do Sistema", f"NOME DA TELA COPIADO: {self.id_str}\n\n{resumo}")
+
+    def get_sql_summary(self):
+        de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+        return (
+            "--- ESTRUTURA SQL (AUDITORIA POCF1 x CRMov4) ---\n"
+            "ORIGEM: POCF1 (Registros de Caixa SIL)\n"
+            "DESTINO: CRMov4 (Itens do Concentrador Técnico)\n\n"
+            "FILTRO PRINCIPAL:\n"
+            f"  Data do Teste (POCF1Tst) entre '{de_raw}' e '{ate_raw}'\n\n"
+            "CHAVES DE BATIMENTO (JOIN):\n"
+            "- CRMovDta  = POCF1DtaMo\n"
+            "- CRMovSeq  = POCF1SeqMo\n"
+            "- CRMov4Ite = POCF1IteMo"
+        )
+
+    def abrir_calendario(self, entry_target):
+        pop = ctk.CTkToplevel(self); pop.title("📅 Data"); pop.geometry("320x400"); pop.attributes("-topmost", True); pop.grab_set()
+        from datetime import date; import calendar; hoje = date.today(); cal_state = {"mes": hoje.month, "ano": hoje.year}
+        main_f = ctk.CTkFrame(pop, fg_color="white"); main_f.pack(fill="both", expand=True, padx=10, pady=10)
+        header_f = ctk.CTkFrame(main_f, fg_color="transparent"); header_f.pack(fill="x", pady=5)
+        lbl_mes_ano = ctk.CTkLabel(header_f, text="", font=("Arial", 14, "bold"), text_color="#1E88E5")
+        def update_view():
+            mes, ano = cal_state["mes"], cal_state["ano"]
+            nome_mes = ["?", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][mes]
+            lbl_mes_ano.configure(text=f"{nome_mes} {ano}")
+            for widget in grid_f.winfo_children():
+                if int(widget.grid_info()["row"]) > 0: widget.destroy()
+            cal = calendar.monthcalendar(ano, mes)
+            for r, week in enumerate(cal):
+                for c, day in enumerate(week):
+                    if day != 0:
+                        btn = ctk.CTkButton(grid_f, text=str(day), width=35, height=35, fg_color="#F1F5F9", text_color="black", hover_color="#CBD5E1", command=lambda d=day: set_date(d))
+                        btn.grid(row=r+1, column=c, padx=2, pady=2)
+        def mudar_mes(inc):
+            cal_state["mes"] += inc
+            if cal_state["mes"] > 12: cal_state["mes"] = 1; cal_state["ano"] += 1
+            elif cal_state["mes"] < 1: cal_state["mes"] = 12; cal_state["ano"] -= 1
+            update_view()
+        ctk.CTkButton(header_f, text="◀", width=30, height=30, command=lambda: mudar_mes(-1)).pack(side="left", padx=10); lbl_mes_ano.pack(side="left", expand=True); ctk.CTkButton(header_f, text="▶", width=30, height=30, command=lambda: mudar_mes(1)).pack(side="right", padx=10)
+        grid_f = ctk.CTkFrame(main_f, fg_color="transparent"); grid_f.pack(fill="both", expand=True)
+        def set_date(dia):
+            entry_target.delete(0, "end"); entry_target.insert(0, f"{dia:02d}/{cal_state['mes']:02d}/{cal_state['ano']}"); pop.destroy()
+        update_view()
+
+    def carregar_divergencias(self):
+        try:
+            import pyodbc; from datetime import datetime
+            for i in self.tree.get_children(): self.tree.delete(i)
+            de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+            if not de_raw or not ate_raw: return
+            de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, "hub") and self.hub else 1
+            
+            sql = f"""
+                SELECT 
+                    f1.POCF1DtaMo, 
+                    f1.POCF1SeqMo, 
+                    f1.POCF1IteMo, 
+                    f1.POCF1Regis,
+                    COALESCE(f1.POCF1ProDe, 'DESC. N/D') as ProDe, 
+                    COALESCE(f1.POCF1Obs, '') as Obs,
+                    f1.POCF1VlrBo,
+                    (SELECT COUNT(*) FROM CRMov4 c4 
+                     WHERE c4.CMEmpCod = f1.POEmpCod 
+                     AND c4.CRMovDta = f1.POCF1DtaMo 
+                     AND c4.CRMovSeq = f1.POCF1SeqMo 
+                     AND c4.CRMov4Ite = f1.POCF1IteMo) as QtdConc
+                FROM POCF1 f1
+                WHERE f1.POEmpCod = ? 
+                AND CAST(f1.POCF1Tst AS DATE) BETWEEN ? AND ?
+                AND f1.POCF1Regis <> 0 
+                AND f1.POCF1VlrBo <> 0
+                AND (
+                    NOT EXISTS (SELECT 1 FROM CRMov4 c4 
+                                WHERE c4.CMEmpCod = f1.POEmpCod 
+                                AND c4.CRMovDta = f1.POCF1DtaMo 
+                                AND c4.CRMovSeq = f1.POCF1SeqMo 
+                                AND c4.CRMov4Ite = f1.POCF1IteMo)
+                    OR 
+                    (SELECT COUNT(*) FROM CRMov4 c4 
+                     WHERE c4.CMEmpCod = f1.POEmpCod 
+                     AND c4.CRMovDta = f1.POCF1DtaMo 
+                     AND c4.CRMovSeq = f1.POCF1SeqMo 
+                     AND c4.CRMov4Ite = f1.POCF1IteMo) > 1
+                )
+                ORDER BY f1.POCF1DtaMo DESC
+            """
+            self.overlay_prog = ctk.CTkFrame(self, fg_color="white", border_width=2, border_color="#1E88E5", corner_radius=15)
+            self.overlay_prog.place(relx=0.5, rely=0.5, anchor="center")
+            ctk.CTkLabel(self.overlay_prog, text="🚀 AUDITORIA POCF1 X CRMOV4", font=("Arial", 14, "bold"), text_color="#1E293B").pack(padx=30, pady=(20, 5))
+            self.p_bar = ctk.CTkProgressBar(self.overlay_prog, width=300, height=12, corner_radius=10, fg_color="#E2E8F0", progress_color="#1E88E5")
+            self.p_bar.pack(padx=30, pady=10); self.p_bar.set(0)
+            self.lbl_prog_val = ctk.CTkLabel(self.overlay_prog, text="⏳ Auditando banco SQL...", font=("Arial", 12), text_color="#1E88E5")
+            self.lbl_prog_val.pack(pady=(0, 20))
+            self.lbl_status.configure(text="⚙️ Consultando SIL x Concentrador...", text_color="#1E88E5")
+            self.update()
+            
+            cur.execute(sql, (posto_id, de, ate))
+            rows = cur.fetchall(); total_regs = len(rows)
+            for i, row in enumerate(rows):
+                # row[0]:Dta, row[1]:Seq, row[2]:Ite, row[3]:Regis, row[4]:ProDe, row[5]:Obs, row[6]:VlrBo, row[7]:QtdConc
+                status = "❌ NÃO RECONHECIDO NO CONCENTR." if row[7] == 0 else f"⚠️ REPLICADO {row[7]}X"
+                v_data = row[0].strftime("%d/%m/%Y") if hasattr(row[0], "strftime") else str(row[0])
+                self.tree.insert("", "end", values=(
+                    v_data, int(row[1]), int(row[2]), str(row[3]), 
+                    str(row[4]).strip().upper(), str(row[5]).strip().upper(),
+                    f"R$ {row[6]:.2f}", status
+                ))
+                if (i + 1) % 50 == 0 or (i + 1) == total_regs:
+                    msg = f"⚙️ Processando: {i+1} de {total_regs}..."; self.lbl_status.configure(text=f"⏳ {msg}")
+                    self.p_bar.set((i + 1) / total_regs); self.update()
+            
+            conn.close(); self.overlay_prog.destroy()
+            self.lbl_total.configure(text=f"📊 Total de Divergências: {total_regs} registros")
+            self.lbl_status.configure(text="🟢 Processamento Concluído", text_color="#10B981")
+            
+            if total_regs == 0:
+                messagebox.showinfo("Sucesso Conciliação", "✅ Período auditado com 100% de integridade!\n\nTodos os lançamentos do SIL (POCF1) foram localizados com sucesso no Concentrador (CRMov4).")
+            
+            for i, child in enumerate(self.tree.get_children()):
+                tag = "even" if i % 2 == 0 else "odd"
+                self.tree.item(child, tags=(tag,))
+            self.tree.tag_configure("even", background="#FFFFFF"); self.tree.tag_configure("odd", background="#E2E8F0")
+        except Exception as e: messagebox.showerror("Erro Conciliação", str(e))
 
 class ModuloPostoWindow(ctk.CTkFrame):
     def __init__(self, parent, config):
@@ -1749,10 +2527,20 @@ class ModuloPostoWindow(ctk.CTkFrame):
         self.col_consistencias.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         ctk.CTkLabel(self.col_consistencias, text="🔍 Consistências", font=("Arial", 14, "bold"), text_color="#1E293B").pack(pady=(15, 10))
         
-        # Botão: Concentrador x Vendas
-        ctk.CTkButton(self.col_consistencias, text="🎯 Concentrador x Vendas", width=btn_width, height=btn_height, font=("Arial", 12, "bold"), 
+        # Botão: CRMov2 x POCF1
+        ctk.CTkButton(self.col_consistencias, text="🎯 CRMov2 x POCF1", width=btn_width, height=btn_height, font=("Arial", 12, "bold"), 
                      command=lambda: self.hub.abrir_modulo(ConciliacaoConcentradorVendasWindow), 
-                     fg_color="#F59E0B", hover_color="#D97706").pack(pady=10, padx=15)
+                     fg_color="#F59E0B", hover_color="#D97706").pack(pady=5, padx=15)
+
+        # Botão: POCF4 x POCF1
+        ctk.CTkButton(self.col_consistencias, text="🔍 POCF4 x POCF1", width=btn_width, height=btn_height, font=("Arial", 12, "bold"), 
+                     command=lambda: self.hub.abrir_modulo(ConciliacaoPOCF4Window), 
+                     fg_color="#F59E0B", hover_color="#D97706").pack(pady=5, padx=15)
+
+        # Botão: POCF1 x CRMov4 (Vinculado)
+        ctk.CTkButton(self.col_consistencias, text="🎯 POCF1 x CRMov4", width=btn_width, height=btn_height, font=("Arial", 12, "bold"), 
+                     command=lambda: self.hub.abrir_modulo(ConciliacaoPOCF1CRMOV4Window), 
+                     fg_color="#F59E0B", hover_color="#D97706").pack(pady=5, padx=15)
 
         # --- COLUNA 2: MOVIMENTAÇÃO / LMC ---
         self.col2 = ctk.CTkFrame(self.content_frame, fg_color="#F8FAFC", corner_radius=15, border_width=2, border_color="#E2E8F0")
@@ -1854,6 +2642,7 @@ def centralizar_tela(tela, w, h):
 class BaseWindow(ctk.CTkFrame):
     def __init__(self, parent, title_str, id_str):
         self.id_str = id_str
+        self.ultima_query_bruta = "" # Sistema de Auditoria Global (Audit-Ready)
         super().__init__(parent, fg_color="#FFFFFF", corner_radius=0)
         self.grid_rowconfigure(1, weight=1); self.grid_columnconfigure(0, weight=1)
 
@@ -1911,6 +2700,11 @@ class BaseWindow(ctk.CTkFrame):
         btn_sair = ctk.CTkButton(self.bottom_bar, text="✖  Fechar Tela", command=self.fechar_tela, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 12, "bold"), border_width=2, border_color="black", width=130)
         btn_sair.pack(side="left", padx=20, pady=5)
 
+        # NOVO: Botão de Auditoria SQL Global (?)
+        self.btn_debug_sql = ctk.CTkButton(self.bottom_bar, text="?", width=28, height=28, corner_radius=14, fg_color="#C62828", hover_color="#B71C1C", text_color="white", font=("Arial", 12, "bold"), command=self.mostrar_sql_bruto)
+        self.btn_debug_sql.pack(side="left", padx=(0, 10), pady=0)
+        ToolTip(self.btn_debug_sql, "VER COMANDO SQL BRUTO (Audit)")
+
         # Botões de Exportação
         self.btn_export_pdf = ctk.CTkButton(self.bottom_bar, text="📄 Exportar PDF", width=120, height=32, fg_color="#E53935", hover_color="#B71C1C", command=self.exportar_pdf)
         self.btn_export_pdf.pack(side="right", padx=5)
@@ -1919,7 +2713,7 @@ class BaseWindow(ctk.CTkFrame):
         self.btn_export_excel.pack(side="right", padx=5)
 
         from tkinter import messagebox
-        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=self.acao_copiar_e_sql)
+        btn_copy_id = ctk.CTkButton(self.bottom_bar, text="📋", width=25, height=25, fg_color="transparent", hover_color="#E0E0E0", text_color="black", font=("Arial", 11, "bold"), command=self.acao_copiar_id)
         btn_copy_id.pack(side="right", padx=(5, 20))
 
         self.lbl_id = ctk.CTkLabel(self.bottom_bar, text=f"Tela: {id_str}", font=("Arial", 11, "bold"), text_color="gray")
@@ -1937,17 +2731,56 @@ class BaseWindow(ctk.CTkFrame):
         else:
             self.pack_forget()
         self.destroy()
-    def acao_copiar_e_sql(self):
-        try:
-            self.clipboard_clear()
-            self.clipboard_append(self.id_str)
-            summary = self.get_sql_summary()
-            msg = f"NOME DA TELA COPIADO: {self.id_str}\n\n--- ESTRUTURA SQL (RESUMO) ---\n{summary}"
-            from tkinter import messagebox
-            messagebox.showinfo("Informação do Sistema", msg)
-        except Exception as e:
-            from tkinter import messagebox
-            messagebox.showerror("Erro", f"Erro ao processar comando: {e}")
+    def acao_copiar_id(self):
+        """Copia apenas o identificador da tela para o clipboard."""
+        self.clipboard_clear()
+        self.clipboard_append(self.id_str)
+        self.update()
+        from tkinter import messagebox
+        messagebox.showinfo("Sucesso", "NOME DA TELA COPIADO")
+
+    def mostrar_sql_bruto(self):
+        """Exibe o comando SQL Pronto/Executado em tempo real, centralizado com botão copiar."""
+        # Tenta gerar a query atual (dinâmica) ou usa a última capturada
+        query = self.get_current_query() if hasattr(self, 'get_current_query') else getattr(self, 'ultima_query_bruta', "")
+        
+        if not query:
+            messagebox.showinfo("SQL Bruto", "Aguardando carregamento de dados (Gere a busca primeiro)...")
+            return
+        
+        win = ctk.CTkToplevel(self)
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        
+        # Centraliza a tela de debug
+        w, h = 800, 600
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        
+        win.transient(self); win.grab_set()
+        
+        lbl = ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 14, "bold"), text_color="#1565C0")
+        lbl.pack(pady=(20, 5))
+        
+        txt = ctk.CTkTextbox(win, font=("Consolas", 12))
+        txt.pack(fill="both", expand=True, padx=20, pady=10)
+        txt.insert("0.0", query)
+        txt.configure(state="disabled")
+        
+        footer = ctk.CTkFrame(win, fg_color="transparent")
+        footer.pack(pady=(0, 20))
+        
+        btn_copy = ctk.CTkButton(footer, text="📋 COPIAR SQL", command=lambda: self.copiar_sql_debug(query, win), fg_color="#2E7D32", hover_color="#1B5E20")
+        btn_copy.pack(side="left", padx=10)
+        
+        btn_close = ctk.CTkButton(footer, text="FECHAR", command=win.destroy, fg_color="#455A64")
+        btn_close.pack(side="right", padx=10)
+
+    def copiar_sql_debug(self, sql, window):
+        """Copia para o clipboard com feedback."""
+        self.clipboard_clear(); self.clipboard_append(sql); self.update()
+        messagebox.showinfo("Clipboard", "SQL Copiado!", parent=window)
+        window.destroy()
 
     def configuring_grid(self, columns, headings, widths, aligns):
         """Método de compatibilidade (v1)"""
@@ -1996,10 +2829,18 @@ class BaseWindow(ctk.CTkFrame):
         def clean_val(v):
             if not v: return ""
             s = str(v).strip().upper()
+            # 1. Moedas R$ 1.234,56
             if "R$" in s:
-                try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").strip())
+                try: return float(s.replace("R$", "").replace(".", "").replace(",", ".").replace(" ", "").strip())
                 except: return 0.0
-            if s.replace(".", "").isdigit():
+            # 2. Datas DD/MM/AAAA
+            if "/" in s and len(s) == 10 and s[2] == "/" and s[5] == "/":
+                try:
+                    from datetime import datetime
+                    return datetime.strptime(s, "%d/%m/%Y")
+                except: pass
+            # 3. Números Genéricos
+            if s.replace(".", "").replace("-", "").isdigit():
                 try: return float(s)
                 except: return s
             return s
@@ -2103,7 +2944,7 @@ POSTO_TABLES_CONFIG = {
     "POCxa1": {"titulo": "Caixa Geral do Posto", "id_tela": "CX_GERAL_POSTO", "tabela": "POCxa1", "colunas": ["POCxa1DCx", "POCxa1Sts", "POCxa1Vlr"], "cabecalhos": ["Data Caixa", "Status", "Valor Total"], "widths": [120, 80, 150], "aligns": ["center", "center", "e"]},
     "POCxa2": {"titulo": "Detalhes Caixa Geral", "id_tela": "CX_GERAL_DET", "tabela": "POCxa2", "colunas": ["POCxa1DCx", "POCxa2Tip", "POCxa2Vlr"], "cabecalhos": ["Data Caixa", "Tipo", "Valor"], "widths": [120, 100, 150], "aligns": ["center", "center", "e"]},
     "POVal": {"titulo": "Cadastro de Vales", "id_tela": "CAD_VALES", "tabela": "POVal", "colunas": ["POValCod", "POValDta", "POValUsu", "POValVlr"], "cabecalhos": ["Cód", "Data", "Frentista", "Valor Vale"], "widths": [80, 100, 120, 120], "aligns": ["center", "center", "w", "e"]},
-    "POENF": {"titulo": "Entrada de Notas", "id_tela": "ENTRADA_NF_POSTO", "tabela": "POENF", "colunas": ["PODtaMov", "POForCod", "POForNNF", "POENFVlrTo"], "cabecalhos": ["Data", "Fornecedor", "Série/Nro", "Valor Total"], "widths": [100, 120, 120, 120], "aligns": ["center", "center", "center", "e"]},
+    "POENF": {"titulo": "Entrada de Notas (Posto)", "id_tela": "ENTRADA_NF_POSTO", "tabela": "POENF", "colunas": ["PODtaMov", "POForCod", "FOR_DES", "POForNNF", "POForDNF", "POTnqCod", "TNQ_DES", "POENFQtd", "POENFVlrTo", "POENFSts"], "cabecalhos": ["📅 Movimento", "🔑 Cód. Forn", "🤝 Fornecedor", "📄 Nro Nota", "📅 Data Nota", "🛢️ Tanque", "📝 Tanque Det.", "📦 Qtd", "💰 Vlr. Total", "🔘 Status"], "widths": [110, 80, 200, 110, 110, 70, 150, 90, 120, 90], "aligns": ["center", "center", "w", "center", "center", "center", "w", "center", "e", "center"]},
     "POFor": {"titulo": "Fornecedores Posto", "id_tela": "FORNECEDORES_POSTO", "tabela": "POFor", "colunas": ["POForCod", "POForDes"], "cabecalhos": ["Cód", "Razão Social"], "widths": [80, 300], "aligns": ["center", "w"]},
     "POPer": {"titulo": "Períodos de Caixa", "id_tela": "PERIODOS_CAIXA", "tabela": "POPer", "colunas": ["POEmpCod", "POPerCod", "POPerDes"], "cabecalhos": ["Posto", "Período", "Descrição"], "widths": [80, 80, 200], "aligns": ["center", "center", "w"]},
     "POTCo": {"titulo": "Tipos Combustível", "id_tela": "TIPOS_COMBUSTIVEL", "tabela": "POTCo", "colunas": ["POTCoCod", "POTCoDes"], "cabecalhos": ["Cód", "Tipo de Combustível"], "widths": [80, 250], "aligns": ["center", "w"]},
@@ -2135,7 +2976,21 @@ POSTO_FIELD_LABELS = {
     "POTnqTipCo": "Tipo de Combustível",
     "POTnqCusUn": "Custo Unitário da Última Entrada da Nota",
     "POTnqConSp": "Código do Tanque para Consolidar no Speed",
-    "POTnqQtd": "Quantidade de Litros que Cabe no Tanque"
+    "POTnqQtd": "Quantidade de Litros que Cabe no Tanque",
+    "PODtaMov": "Data do Movimento",
+    "POForCod": "Código do Fornecedor",
+    "POForNNF": "Número da Nota Fiscal",
+    "POForDNF": "Data da Nota Fiscal",
+    "POENFQtd": "Quantidade de Entrada",
+    "POENFVlrTo": "Valor Total da Nota",
+    "POENFVlrUn": "Valor Unitário do Produto",
+    "POENFObs": "Observações da Nota",
+    "POENFSts": "Situação (A-Aberto, F-Fechado, C-Cancelado)",
+    "POENFDtaPg": "Data do Pagamento",
+    "POENFOrg": "Origem (0-Comb, 1-Lub, 9-Div)",
+    "POENFNFE": "Chave de Acesso NFE (60 dígitos)",
+    "POENFBCO": "Código do Banco",
+    "POENFCHQ": "Número do Cheque"
 }
 
 class FormularioPostoWindow(ctk.CTkToplevel):
@@ -2214,8 +3069,10 @@ class FormularioPostoWindow(ctk.CTkToplevel):
                     sql = f"SELECT * FROM {tabela} WHERE POEmpCod = ? AND POMBoCod = ? AND POBomCod = ?"
                     cur.execute(sql, self.pk_value)
                 elif isinstance(self.pk_value, (list, tuple)):
-                    # CASO GERAL CHAVE COMPOSTA (Ex: Empresa + ID)
-                    sql = f"SELECT * FROM {tabela} WHERE POEmpCod = ? AND {self.all_columns[0 if self.all_columns[0].upper() != 'POEMPCOD' else 1]} = ?"
+                    # CASO GERAL CHAVE COMPOSTA (Dinâmico: Suporta POENF com 4 campos)
+                    key_cols = self.all_columns[:len(self.pk_value)]
+                    where_clauses = [f"{col} = ?" for col in key_cols]
+                    sql = f"SELECT * FROM {tabela} WHERE {' AND '.join(where_clauses)}"
                     cur.execute(sql, self.pk_value)
                 else:
                     # Caso Padrão (Chave Simples)
@@ -2237,20 +3094,26 @@ class FormularioPostoWindow(ctk.CTkToplevel):
                 exibir_nome = POSTO_FIELD_LABELS.get(col, col)
                 ctk.CTkLabel(frame, text=f"{exibir_nome}:", font=lbl_font, text_color=lbl_color, width=180, anchor="w").pack(side="left")
                 
-                # --- NOVO: Lógica de ComboBox para Campos Específicos (POBXB) ---
-                if tabela.upper() == "POBXB" and col.upper() in ["POMBOCOD", "POBOMCOD"]:
+                # --- NOVO: Lógica de ComboBox para Campos Específicos (POBXB e POENF) ---
+                use_combo = False
+                if tabela.upper() == "POBXB" and col.upper() in ["POMBOCOD", "POBOMCOD"]: use_combo = True
+                if tabela.upper() == "POENF" and col.upper() in ["POTNQCOD", "POFORCOD"]: use_combo = True
+                
+                if use_combo:
                     options = []
                     try:
-                        if col.upper() == "POMBOCOD": # Bomba
+                        if col.upper() == "POMBOCOD" or (tabela.upper() == "POBXB" and col.upper() == "POBOMCOD"):
                             cur.execute("SELECT POBomCod, POBomDes FROM POBom WHERE POEmpCod = ?", (posto_id,))
-                            options = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
-                        else: # Bico
-                            # Para o Bico, buscamos do cadastro de bombas (POBom) também, assumindo ser a mestre de equipamentos
-                            cur.execute("SELECT POBomCod, POBomDes FROM POBom WHERE POEmpCod = ?", (posto_id,))
-                            options = [f"{r[0]} - {r[1]}" for r in cur.fetchall()]
-                    except: pass
+                            options = [f"{r[0]} - {str(r[1]).strip()}" for r in cur.fetchall()]
+                        elif col.upper() == "POTNQCOD":
+                            cur.execute("SELECT POTnqCod, POTnqDes FROM POTnq WHERE POEmpCod = ?", (posto_id,))
+                            options = [f"{r[0]} - {str(r[1]).strip()}" for r in cur.fetchall()]
+                        elif col.upper() == "POFORCOD":
+                            cur.execute("SELECT POForCod, POForDes FROM POFor ORDER BY POForDes")
+                            options = [f"{r[0]} - {str(r[1]).strip()}" for r in cur.fetchall()]
+                    except Exception as e: print(f"DEBUG Erro carregar combos form: {e}")
                     
-                    if not options: options = ["1", "2", "3", "4", "5"]
+                    if not options: options = ["1", "2"]
                     
                     widget = ctk.CTkComboBox(frame, values=options, font=("Arial", 13), height=32, dropdown_font=("Arial", 13))
                     widget.pack(side="left", fill="x", expand=True)
@@ -2451,7 +3314,10 @@ class TabelaPostoWindow(BaseWindow):
                     WHERE t.POEmpCod = ?
                     ORDER BY t.POBomCod DESC
                 """
-                cur.execute(sql, (posto_id,))
+                params = (posto_id,)
+                # Debug SQL Bruto
+                self.ultima_query_bruta = sql.replace("?", f"'{params[0]}'")
+                cur.execute(sql, params)
             
             # --- CASO ESPECIAL: CAD_TANQUES (POTnq) com JOIN para Tipo Combustível ---
             elif tab.upper() == "POTNQ":
@@ -2469,7 +3335,9 @@ class TabelaPostoWindow(BaseWindow):
                     WHERE t.POEmpCod = ?
                     ORDER BY t.POTnqCod DESC
                 """
-                cur.execute(sql, (posto_id,))
+                params = (posto_id,)
+                self.ultima_query_bruta = sql.replace("?", f"'{params[0]}'")
+                cur.execute(sql, params)
             
             # --- CASO ESPECIAL: VIN_BICO_BOMBA (POBxB) com JOIN Duplo ---
             elif tab.upper() == "POBXB":
@@ -2487,21 +3355,37 @@ class TabelaPostoWindow(BaseWindow):
                     ORDER BY v.POMBoCod, v.POBomCod
                 """
                 cur.execute(sql, (posto_id,))
-            
-            # Verifica se a tabela possui a coluna POEmpCod para filtrar
-            # EXCEÇÃO: A tabela POEmp (Cadastro de Postos) deve mostrar TODOS os registros.
+
+            # --- CASO ESPECIAL: ENTRADA NF (POENF) com JOIN p/ Nome Fornecedor e Tanque ---
+            elif tab.upper() == "POENF":
+                sql = """
+                    SELECT 
+                        t.PODtaMov, t.POForCod, f.POForDes as FOR_DES, t.POForNNF, 
+                        t.POForDNF, t.POTnqCod, nq.POTnqDes as TNQ_DES, t.POENFQtd, 
+                        t.POENFVlrTo, t.POENFSts
+                    FROM POENF t
+                    LEFT JOIN POFor f ON t.POForCod = f.POForCod
+                    LEFT JOIN POTnq nq ON t.POTnqCod = nq.POTnqCod AND t.POEmpCod = nq.POEmpCod
+                    WHERE t.POEmpCod = ?
+                    ORDER BY t.PODtaMov DESC
+                """
+                cur.execute(sql, (posto_id,))
+
+            # --- CASO GERAL: Sem JOINs (Tabelas Simples) ---
             elif tab.upper() != "POEMP":
                 try:
                     cur.execute(f"SELECT TOP 0 POEmpCod FROM {tab}")
-                    sql = f"SELECT TOP 1000 {cols} FROM {tab} WHERE POEmpCod = ? ORDER BY {self.table_info['colunas'][0]} DESC"
+                    self.ultima_query_bruta = f"SELECT TOP 1000 {cols} FROM {tab} WHERE POEmpCod = {posto_id} ORDER BY {self.table_info['colunas'][0]} DESC"
                     cur.execute(sql, (posto_id,))
                 except:
                     # Caso não tenha POEmpCod (EX: POFor, POLvr, POTCo...), carrega sem filtro
                     sql = f"SELECT TOP 1000 {cols} FROM {tab} ORDER BY {self.table_info['colunas'][0]} DESC"
+                    self.ultima_query_bruta = sql
                     cur.execute(sql)
             else:
                 # Caso seja POEmp, mostra todos os postos cadastrados
                 sql = f"SELECT TOP 1000 {cols} FROM {tab} ORDER BY {self.table_info['colunas'][0]}"
+                self.ultima_query_bruta = sql
                 cur.execute(sql)
 
             rows = cur.fetchall()
@@ -2510,17 +3394,320 @@ class TabelaPostoWindow(BaseWindow):
             
             for r in rows:
                 fmt_vals = []
-                for v in r:
+                for idx, v in enumerate(r):
                     if hasattr(v, 'strftime'): 
                          fmt_vals.append(v.strftime("%d/%m/%Y"))
+                    elif isinstance(v, (int, float)):
+                         col_name = str(cur.description[idx][0]).upper()
+                         # Formatação para Moeda / Preços (2 ou 3 casas)
+                         if "VLR" in col_name or "CUS" in col_name or "TOT" in col_name or "SAL" in col_name:
+                             # Se for valor unitário, usar 3 casas decimais (Padrão Posto p/ Bicos e Notas)
+                             dec = 3 if "UN" in col_name or "BOM" in col_name else 2
+                             fmt = f"R$ {v:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                             fmt_vals.append(fmt)
+                         elif "QTD" in col_name or "LMC" in col_name:
+                             fmt_vals.append(f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                         else:
+                             fmt_vals.append(v)
                     else: 
-                         fmt_vals.append(v)
+                         fmt_vals.append(str(v or ""))
                 self.tree.insert("", "end", values=tuple(fmt_vals))
             
             self.re_zebrar()
             conn.close()
         except Exception as e:
             print(f"Erro ao carregar {self.table_info['tabela']}: {e}")
+
+class EntradaNFPostoWindow(BaseWindow):
+    def __init__(self, parent, config):
+        self.table_info = POSTO_TABLES_CONFIG["POENF"]
+        super().__init__(parent, self.table_info['titulo'], self.table_info['id_tela'])
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent # Fallback p/ MainHub
+        
+        # --- BARRA DE FILTROS (Premium) ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", fill="x", expand=True, padx=20, pady=(0, 5))
+
+        # Filtro de Período
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        ctk.CTkLabel(self.filter_frame, text="📅 De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(self.filter_frame, width=95, height=32, font=("Arial", 13)); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(self.filter_frame, text="Até:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(5, 2))
+        self.ent_ate = ctk.CTkEntry(self.filter_frame, width=95, height=32, font=("Arial", 13)); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+
+        # Seletor de Tipo de Data
+        ctk.CTkLabel(self.filter_frame, text="Filtrar por Data:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 2))
+        self.combo_tipo_data = ctk.CTkComboBox(self.filter_frame, values=["Movimento", "Data Nota"], width=130, height=32, font=("Arial", 12))
+        self.combo_tipo_data.pack(side="left", padx=2); self.combo_tipo_data.set("Movimento")
+
+        # Filtro de Fornecedor (ComboBox Dinâmico conforme Grid)
+        ctk.CTkLabel(self.filter_frame, text="🤝 Fornecedor:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 2))
+        self.combo_fornecedor = ctk.CTkComboBox(self.filter_frame, values=["TODOS"], width=200, height=32, font=("Arial", 12))
+        self.combo_fornecedor.pack(side="left", padx=2); self.combo_fornecedor.set("TODOS")
+
+        # Busca Textual
+        ctk.CTkLabel(self.filter_frame, text="🔍 Busca:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(15, 2))
+        self.ent_busca = ctk.CTkEntry(self.filter_frame, placeholder_text="Forn. ou Nro Nota...", width=180, height=32, font=("Arial", 13))
+        self.ent_busca.pack(side="left", padx=2)
+        self.ent_busca.bind("<Return>", lambda e: self.carregar_dados())
+
+        self.btn_filtrar = ctk.CTkButton(self.filter_frame, text="⚙️ Filtrar", width=90, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#1E88E5", hover_color="#1565C0", command=self.carregar_dados)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        # Botão Incluir
+        self.btn_incluir = ctk.CTkButton(self.top_frame, text="➕ Lançar Nota", width=140, height=35, font=("Arial", 12, "bold"), 
+                                        fg_color="#2E7D32", hover_color="#1B5E20", command=self.abrir_formulario_incluir)
+        self.btn_incluir.pack(side="right", padx=20, pady=10)
+
+        self.configurar_grid(
+            columns=self.table_info['colunas'],
+            headings=self.table_info['cabecalhos'],
+            widths=self.table_info['widths'],
+            aligns=self.table_info['aligns']
+        )
+        
+        self.tree.bind("<Double-1>", self.abrir_formulario_alterar)
+        
+        # --- RODAPÉ DE TOTAIS (Excel Style) ---
+        # Utiliza o tree_totais de BaseWindow para alinhamento automático com as colunas
+        self.after(200, self.carregar_dados)
+
+    def abrir_formulario_incluir(self):
+        FormularioPostoWindow(self, self.config_db, self.table_info)
+
+    def abrir_formulario_alterar(self, event):
+        item = self.tree.identify_row(event.y)
+        if not item: return
+        vals = self.tree.item(item, "values")
+        posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+        
+        # CHAVE COMPOSTA POENF (5 campos sincronizados com banco): 
+        # Empresa, Movimento(0), Tanque(5), Fornecedor(1), Nota(3)
+        pk_val = [posto_id, vals[0], vals[5], vals[1], vals[3]]
+        FormularioPostoWindow(self, self.config_db, self.table_info, pk_value=pk_val)
+
+    def get_current_query(self):
+        # Captura estados dos filtros em tempo real para auditoria
+        de_raw = self.ent_de.get().strip()
+        ate_raw = self.ent_ate.get().strip()
+        busca = self.ent_busca.get().strip().upper()
+        posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+        
+        where_extra = ""
+        if de_raw and ate_raw:
+            try:
+                from datetime import datetime
+                d_ini = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+                d_f = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+                field_map = {"Movimento": "t.PODtaMov", "Data Nota": "t.POForDNF"}
+                selected_field = field_map.get(self.combo_tipo_data.get(), "t.PODtaMov")
+                where_extra += f" AND CAST({selected_field} AS DATE) BETWEEN '{d_ini}' AND '{d_f}'"
+            except: pass
+        
+        if busca:
+            where_extra += f" AND (f.POForDes LIKE '%{busca}%' OR CAST(t.POForNNF AS VARCHAR) LIKE '%{busca}%')"
+
+        # Filtro Fornecedor (Combo)
+        forn_sel = self.combo_fornecedor.get()
+        if forn_sel and forn_sel != "TODOS":
+            try: 
+                cod_forn = int(forn_sel.split(" - ")[0])
+                where_extra += f" AND t.POForCod = {cod_forn}"
+            except: pass
+
+        sql = f"""
+            SELECT 
+                t.PODtaMov, t.POForCod, f.POForDes as FOR_DES, t.POForNNF, 
+                t.POForDNF, t.POTnqCod, nq.POTnqDes as TNQ_DES, t.POENFQtd, 
+                t.POENFVlrTo, t.POENFSts
+            FROM POENF t
+            LEFT JOIN POFor f ON t.POForCod = f.POForCod
+            LEFT JOIN POTnq nq ON t.POTnqCod = nq.POTnqCod AND t.POEmpCod = nq.POEmpCod
+            WHERE t.POEmpCod = {posto_id} {where_extra}
+            ORDER BY t.PODtaMov DESC
+        """.strip()
+        return sql
+
+    def carregar_combo_fornecedores(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            cur.execute("SELECT POForCod, POForDes FROM POFor ORDER BY POForDes")
+            rows = cur.fetchall()
+            conn.close()
+            
+            opcoes = ["TODOS"]
+            for r in rows:
+                if r[0] and r[1]:
+                    opcoes.append(f"{int(r[0])} - {str(r[1]).strip().upper()}")
+            self.combo_fornecedor.configure(values=opcoes)
+        except Exception as e:
+            print(f"Erro carregar combo fornecedores POENF: {e}")
+
+    def abrir_calendario(self, entry_target):
+        # Implementação de um seletor de data dinâmico (Pop-up)
+        pop = ctk.CTkToplevel(self)
+        pop.title("📅 Selecionar Data")
+        pop.geometry("320x400")
+        pop.attributes("-topmost", True)
+        pop.grab_set()
+        from datetime import date
+        import calendar
+        hoje = date.today()
+        cal_state = {"mes": hoje.month, "ano": hoje.year}
+        main_f = ctk.CTkFrame(pop, fg_color="white")
+        main_f.pack(fill="both", expand=True, padx=10, pady=10)
+        header_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        header_f.pack(fill="x", pady=5)
+        lbl_mes_ano = ctk.CTkLabel(header_f, text="", font=("Arial", 14, "bold"), text_color="#1E88E5")
+        
+        def update_view():
+            mes, ano = cal_state["mes"], cal_state["ano"]
+            nome_mes = ["?", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][mes]
+            lbl_mes_ano.configure(text=f"{nome_mes} {ano}")
+            for widget in grid_f.winfo_children():
+                if int(widget.grid_info()["row"]) > 0: widget.destroy()
+            cal = calendar.monthcalendar(ano, mes)
+            for r, week in enumerate(cal):
+                for c, day in enumerate(week):
+                    if day != 0:
+                        btn = ctk.CTkButton(grid_f, text=str(day), width=35, height=35, fg_color="#F1F5F9", text_color="black", hover_color="#CBD5E1", command=lambda d=day: set_date(d))
+                        btn.grid(row=r+1, column=c, padx=2, pady=2)
+
+        def mudar_mes(inc):
+            cal_state["mes"] += inc
+            if cal_state["mes"] > 12: cal_state["mes"] = 1; cal_state["ano"] += 1
+            elif cal_state["mes"] < 1: cal_state["mes"] = 12; cal_state["ano"] -= 1
+            update_view()
+
+        ctk.CTkButton(header_f, text="◀", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(-1)).pack(side="left", padx=10)
+        lbl_mes_ano.pack(side="left", expand=True)
+        ctk.CTkButton(header_f, text="▶", width=30, height=30, fg_color="#94A3B8", command=lambda: mudar_mes(1)).pack(side="right", padx=10)
+        grid_f = ctk.CTkFrame(main_f, fg_color="transparent")
+        grid_f.pack(fill="both", expand=True)
+        dias_sem = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"]
+        for i, ds in enumerate(dias_sem):
+            ctk.CTkLabel(grid_f, text=ds, font=("Arial", 10, "bold"), text_color="gray").grid(row=0, column=i, pady=5)
+        def set_date(dia):
+            entry_target.delete(0, "end"); entry_target.insert(0, f"{dia:02d}/{cal_state['mes']:02d}/{cal_state['ano']}")
+            pop.destroy()
+        update_view()
+
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            
+            # Filtros
+            de = self.ent_de.get().strip()
+            ate = self.ent_ate.get().strip()
+            busca = self.ent_busca.get().strip().upper()
+            
+            where_extra = ""
+            params = [posto_id]
+            
+            if de and ate:
+                from datetime import datetime
+                d_ini = datetime.strptime(de, "%d/%m/%Y").strftime("%Y-%m-%d")
+                d_fim = datetime.strptime(ate, "%d/%m/%Y").strftime("%Y-%m-%d")
+                field_map = {"Movimento": "t.PODtaMov", "Data Nota": "t.POForDNF"}
+                selected_field = field_map.get(self.combo_tipo_data.get(), "t.PODtaMov")
+                where_extra += f" AND CAST({selected_field} AS DATE) BETWEEN ? AND ? "
+                params.extend([d_ini, d_fim])
+            
+            # Filtro Fornecedor (Combo)
+            forn_sel = self.combo_fornecedor.get()
+            if forn_sel and forn_sel != "TODOS":
+                try: 
+                    cod_forn = int(forn_sel.split(" - ")[0])
+                    where_extra += " AND t.POForCod = ? "
+                    params.append(cod_forn)
+                except: pass
+            
+            if busca:
+                where_extra += " AND (f.POForDes LIKE ? OR CAST(t.POForNNF AS VARCHAR) LIKE ?) "
+                params.extend([f"%{busca}%", f"%{busca}%"])
+
+            sql = f"""
+                SELECT 
+                    t.PODtaMov, t.POForCod, f.POForDes as FOR_DES, t.POForNNF, 
+                    t.POForDNF, t.POTnqCod, nq.POTnqDes as TNQ_DES, t.POENFQtd, 
+                    t.POENFVlrTo, t.POENFSts
+                FROM POENF t
+                LEFT JOIN POFor f ON t.POForCod = f.POForCod
+                LEFT JOIN POTnq nq ON t.POTnqCod = nq.POTnqCod AND t.POEmpCod = nq.POEmpCod
+                WHERE t.POEmpCod = ? {where_extra}
+                ORDER BY t.PODtaMov DESC
+            """
+            
+            # --- DEBUG INFO ---
+            self.ultima_query_bruta = sql
+            for p in params:
+                val = f"'{p}'" if isinstance(p, str) else str(p)
+                self.ultima_query_bruta = self.ultima_query_bruta.replace("?", val, 1)
+
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+            # --- NOVO: Atualizar Combo Fornecedores apenas com os dados carregados (se estiver em TODOS) ---
+            if forn_sel == "TODOS":
+                fornecedores_grid = set()
+                for r in rows:
+                    if r[1] and r[2]: # POForCod and POForDes
+                        fornecedores_grid.add(f"{int(r[1])} - {str(r[2]).strip().upper()}")
+                opcoes = ["TODOS"] + sorted(list(fornecedores_grid))
+                self.combo_fornecedor.configure(values=opcoes)
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            fmt = lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            total_qtd = 0
+            total_vlr = 0
+            count = len(rows)
+            
+            for r in rows:
+                total_qtd += float(r[7] or 0)
+                total_vlr += float(r[8] or 0)
+                
+                fmt_vals = []
+                for i, v in enumerate(r):
+                    if hasattr(v, 'strftime'): fmt_vals.append(v.strftime("%d/%m/%Y"))
+                    elif i == 8: fmt_vals.append(fmt(float(v or 0)))
+                    elif i == 7: fmt_vals.append(f"{int(float(v or 0))}") # Qtd sem decimais conforme pedido
+                    else: fmt_vals.append(str(v or ""))
+                self.tree.insert("", "end", values=tuple(fmt_vals))
+            
+            # Atualizar Totais no Rodapé (Alinhado com colunas)
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            
+            row_totais = [""] * len(self.table_info['colunas'])
+            row_totais[0] = f"REGISTROS: {count}"
+            row_totais[7] = f"{int(total_qtd)}" # Qtd sem decimais
+            row_totais[8] = fmt(total_vlr)
+            self.tree_totais.insert("", "end", values=tuple(row_totais))
+
+            self.re_zebrar()
+            conn.close()
+        except Exception as e:
+            print(f"Erro ao carregar especializado POENF: {e}")
+
 
 
 
@@ -2575,17 +3762,67 @@ class AnaliseProdutoWindow(BaseWindow):
         metrica = self.combo_metrica.get()
         limite = self.combo_limite.get().replace("Top ", "")
         pesquisa = self.txt_pesquisa.get().strip()
-        where = ["c2.CRMov2Flag IN ('A', 'F')", "c4.CRMovDta IS NOT NULL", "YEAR(c4.CRMovDta) != 9999"]
-        if ano != "Todos": where.append(f"YEAR(c4.CRMovDta) = {int(ano)}")
-        if mes != "Todos": where.append("MONTH(c4.CRMovDta) = ...")
-        if pesquisa: where.append(f"p.CEProDes LIKE '%{pesquisa}%'")
+        
+        where_mes = f"AND MONTH(c4.CRMovDta) = {self.meses_ext.index(mes)}" if mes != "Todos" else ""
+        where_pesquisa = f"AND p.CEProDes LIKE '%{pesquisa}%'" if pesquisa else ""
 
         return (
-            "TABELAS:\n- CRMOV4 c4 (Itens de Venda)\n- CRMOV2 c2 (Cabeçalho)\n- CEPRO p (Produtos)\n\n"
-            "CAMPOS PARA ANÁLISE:\n- c4.CEProCod: Código do Produto (Agrupamento)\n- p.CEProDes: Descrição do Produto\n"
-            "- c4.CRMov4Qtd: Quantidade Vendida (Soma)\n- c2.CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "FILTRO ATUAL (WHERE):\n  " + "\n  AND ".join(where) + f"\n\nORDEM: {metrica} DESC\nLIMITE: TOP {limite}"
+            "--- ESTRUTURA SQL (RESUMO) ---\n"
+            "TABELAS:\n"
+            "- CRMOV4 c4 (Itens de Venda)\n"
+            "- CRMOV2 c2 (Cabeçalhos de Venda)\n"
+            "- CEPRO p (Cadastro de Produtos)\n\n"
+            
+            "CÁLCULOS TÉCNICOS (MÉTRICAS):\n"
+            "- VALOR VENDA: (Qtd * VlrUnit) - Desc - VDV - VAF\n"
+            "- VALOR CUSTO: (c4.CRMov4CusP * Qtd)\n"
+            "- LUCRO: (Venda - Custo)\n\n"
+            
+            "FILTRO ATUAL (WHERE):\n"
+            "  c2.CMEmpCod = (Posto Selecionado)\n"
+            "  AND c2.CRMov2Flag IN ('A', 'F')\n"
+            f"  AND YEAR(c4.CRMovDta) = '{ano}'\n"
+            f"  {where_mes}\n"
+            f"  {where_pesquisa}\n\n"
+            
+            "ORDENAÇÃO E LIMITE:\n"
+            f"  {metrica} DESC\n"
+            f"  TOP {limite}"
         )
+
+    def get_current_query(self):
+        """Monta o SQL real que será executado na análise de produtos, com filtros dinâmicos."""
+        ano = self.combo_ano.get()
+        mes = self.combo_mes.get()
+        limite = self.combo_limite.get().replace("Top ", "")
+        metrica = self.combo_metrica.get()
+        pesquisa = self.txt_pesquisa.get().strip()
+        
+        where_clauses = ["c4.CRMovDta IS NOT NULL", "YEAR(c4.CRMovDta) != 9999", "c2.CRMov2Flag IN ('A', 'F')"]
+        if ano != "Todos": where_clauses.append(f"YEAR(c4.CRMovDta) = {int(ano)}")
+        if mes != "Todos": 
+            try: mes_idx = self.meses_ext.index(mes); where_clauses.append(f"MONTH(c4.CRMovDta) = {mes_idx}")
+            except: pass
+        if pesquisa: where_clauses.append(f"p.CEProDes LIKE '%{pesquisa}%'")
+
+        where_str = " AND ".join(where_clauses)
+        order_venda = "SUM((c4.CRMov4Qtd * c4.CRMov4VlrU) - ((c4.CRMov4Qtd * c4.CRMov4PreT) * (c4.CRMov4PerD / 100.0)) - c4.CRMov4VlDs - c4.CRMov4VDV - c4.CRMov4VAF)"
+        order_custo = "SUM(c4.CRMov4CusP * c4.CRMov4Qtd)"
+        
+        if metrica == "Valor Venda": order_by = f"{order_venda} DESC"
+        elif metrica == "Lucro": order_by = f"({order_venda} - {order_custo}) DESC"
+        else: order_by = "SUM(c4.CRMov4Qtd) DESC"
+
+        return f"""SELECT TOP {int(limite)} c4.CEProCod, p.CEProDes, 
+    SUM(c4.CRMov4Qtd) as TotalQtd,
+    {order_venda} as TotalVenda,
+    {order_custo} as TotalCusto
+FROM crmov4 c4
+INNER JOIN crmov2 c2 ON c4.CMEmpCod = c2.CMEmpCod AND c4.CMFilCod = c2.CMFilCod AND c4.CRMovDta = c2.CRMovDta AND c4.CRMovSeq = c2.CRMovSeq
+INNER JOIN cepro p ON c4.CEProCod = p.CEProCod
+WHERE {where_str}
+GROUP BY c4.CEProCod, p.CEProDes 
+ORDER BY {order_by}"""
 
     def carregar_anos(self):
 
@@ -2644,6 +3881,7 @@ class AnaliseProdutoWindow(BaseWindow):
                 WHERE {where_str}
                 GROUP BY c4.CEProCod, p.CEProDes ORDER BY {order_by}
             """
+            self.ultima_query_bruta = query # Auditoria SQL Bruta
             df = pd.read_sql(query, conn); conn.close()
 
             for index, row in df.iterrows():
@@ -2791,6 +4029,31 @@ class ResumoClienteWindow(BaseWindow):
 
         self.after(200, self.carregar_anos)
 
+    def get_current_query(self):
+        """Monta o SQL real que será executado na análise de clientes, refletindo Ano e Mês em tempo real."""
+        ano = self.combo_ano.get()
+        mes = self.combo_mes.get()
+        top = self.combo_top.get()
+
+        limit = ""
+        if top.startswith("Top"): limit = f"TOP {top.replace('Top ', '')} "
+
+        where_clauses = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999", "CRMov2CodC NOT IN (1)"]
+        if ano != "Todos": where_clauses.append(f"YEAR(CRMovDta) = {int(ano)}")
+        if mes != "Todos": 
+            meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+            try: mes_idx = meses_ext.index(mes); where_clauses.append(f"MONTH(CRMovDta) = {mes_idx}")
+            except: pass
+
+        where_str = " AND ".join(where_clauses)
+        
+        return f"""SELECT {limit}
+    CRMov2CodC, CRMov2DesC, SUM(CRMov2VlrO) as Valor
+FROM crmov2
+WHERE {where_str}
+GROUP BY CRMov2CodC, CRMov2DesC
+ORDER BY SUM(CRMov2VlrO) DESC"""
+
     
     def get_sql_summary(self):
         ano = self.combo_ano.get()
@@ -2855,6 +4118,7 @@ class ResumoClienteWindow(BaseWindow):
                 GROUP BY CRMov2CodC, CRMov2DesC
                 ORDER BY Valor DESC
             """
+            self.ultima_query_bruta = query # Auditoria SQL Bruta
             cursor.execute(query)
             rows = cursor.fetchall(); conn.close()
 
@@ -3063,6 +4327,7 @@ class ClientesPararamWindow(BaseWindow):
                 HAVING MAX(c2.CRMovDta) <= DATEADD(day, -{dias_inativo}, GETDATE())
                 ORDER BY MediaAno DESC
             """
+            self.ultima_query_bruta = query # Auditoria SQL Bruta
             cursor.execute(query)
             self.rows_cache = cursor.fetchall(); conn.close()
             self.filtrar_grid()
@@ -3286,6 +4551,7 @@ class SugestaoCompraWindow(BaseWindow):
                 HAVING ISNULL(SUM(c4.CRMov4Qtd), 0) > 0 OR ISNULL(SUM(f.ceprofqtda), 0) > 0
                 ORDER BY p.CEProDes
             """
+            self.ultima_query_bruta = query # Auditoria SQL Bruta
             cursor.execute(query)
             self.rows_cache = cursor.fetchall(); conn.close()
             self.filtrar_grid()
@@ -3655,17 +4921,30 @@ class EstoqueParadoWindow(BaseWindow):
     def get_sql_summary(self):
         dias = self.combo_dias.get().replace(" dias", "")
         return (
-            "TABELAS:\n- CEPRO p (Cadastro de Produtos)\n- CEPROF f (Estoque por Filial)\n"
-            "- CRMOV4 m (Itens de Venda)\n\n"
-            "CAMPOS UTILIZADOS:\n- p.CEProCod: Código do Produto\n- p.CEProDes: Descrição do Produto\n"
-            "- f.CEProFQtdA: Saldo de Estoque (Soma)\n- p.CEProPreCu: Preço de Custo (Unitário)\n"
-            "- m.CRMovDta: Data da Venda (MAX para Última Operação)\n\n"
-            "REGRA DE FILTRAGEM (HAVING):\n"
-            "  - Saldo em Estoque (Sum) > 0\n"
-            "  - Data da Última Venda <= DATEADD(day, -" + dias + ", GETDATE())\n"
-            "  (Produtos sem giro há mais de " + dias + " dias)\n\n"
-            "ORDENAÇÃO:\n  (Estoque * Custo) DESC"
+            "TABELAS: CEPRO, CEPROF, CRMOV4\n"
+            "REGRA: Produtos com estoque > 0 e última venda há mais de " + dias + " dias.\n"
+            "ORDENAÇÃO: (Estoque * Custo) DESC"
         )
+
+    def get_current_query(self):
+        """Monta o SQL real que será executado na análise de estoque parado, com filtros de dias e busca em tempo real."""
+        dias_str = self.combo_dias.get().replace(" dias", "")
+        try: dias = int(dias_str)
+        except: dias = 90
+        
+        return f"""SELECT 
+    p.CEProCod, 
+    p.CEProDes, 
+    SUM(f.CEProFQtdA) as Estoque, 
+    p.CEProPreCu as Custo,
+    MAX(m.CRMovDta) as UltimaVenda
+FROM cepro p
+INNER JOIN ceprof f ON p.CEProCod = f.CEProCod
+LEFT JOIN crmov4 m ON p.CEProCod = m.CEProCod
+GROUP BY p.CEProCod, p.CEProDes, p.CEProPreCu
+HAVING SUM(f.CEProFQtdA) > 0 
+  AND (MAX(m.CRMovDta) <= DATEADD(day, -{dias}, GETDATE()) OR MAX(m.CRMovDta) IS NULL)
+ORDER BY (SUM(f.CEProFQtdA) * ISNULL(p.CEProPreCu, 0)) DESC"""
 
     def carregar_dados(self):
 
@@ -3778,6 +5057,23 @@ class AnaliseParcelasWindow(BaseWindow):
         self.bars = None
 
         self.after(100, self.carregar_dados)
+
+    def get_current_query(self):
+        """Retorna o comando SQL real utilizado para alimentar o gráfico de parcelas em aberto."""
+        return """SELECT 
+    c2.CRMov2CodC as CodC, 
+    c2.CRMov2DesC as Nome, 
+    c3.CRMov3DtaV as Vencimento, 
+    c3.CRMov3VlAb as Valor
+FROM crmov3 c3
+INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod 
+                   AND c3.CMFilCod = c2.CMFilCod 
+                   AND c3.CRMovDta = c2.CRMovDta 
+                   AND c3.CRMovSeq = c2.CRMovSeq
+WHERE c3.CRMov3VlAb > 0 
+  AND c3.CRMov3Flag = 'A'
+  AND c2.CRMov2CodC <> 1
+"""
 
     def get_sql_summary(self):
         return (
@@ -4036,38 +5332,51 @@ class CobrancaClienteWindow(BaseWindow):
         self.rows_cache = []
         self.reverse_sort = False
 
-        # DUPLO CLIQUE: Ver parcelas detalhadas
-        self.tree.bind("<Double-1>", self.on_double_click)
+        # CLIQUE SIMPLES: Ver parcelas detalhadas (Conforme Standard Ouro)
+        self.tree.bind("<Button-1>", self.on_single_click_cobranca)
+        self.tree.bind("<Double-1>", self.on_single_click_cobranca) 
+
+    def on_single_click_cobranca(self, event):
+        item_id = self.tree.identify_row(event.y)
+        if not item_id: return
+        self.tree.selection_set(item_id)
+        self.tree.focus(item_id)
+        vals = self.tree.item(item_id)['values']
+        self.hub.abrir_modulo_detalhes_cobranca(vals[0], vals[1])
 
         self.after(100, self.carregar_dados)
 
     def get_sql_summary(self):
-        emp = self.config_db.get("empresa", "01")
         atraso = self.combo_atraso.get()
-        having = ""
-        if atraso == "Até 30 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
-        elif atraso == "Até 60 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
-        elif atraso == "Até 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
-        elif atraso == "Superior a 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
-
         return (
-            "TABELAS:\n"
-            "- CRMOV3 c3 (Parcelas)\n"
-            "- CRMOV2 c2 (Cabeçalho Venda)\n\n"
-            "CAMPOS PARA ANÁLISE:\n"
-            "- c3.CRMov3DtaV: Data de Vencimento\n"
-            "- c3.CRMov3VlAb: Valor em Aberto Atual (Soma)\n"
-            "- c3.CRMov3Flag: Situação Parcela (A=Aberta)\n"
-            "- c2.CRMov2CodC: Código do Cliente (Agrupamento)\n"
-            "- c2.CRMov2DesC: Razão Social/Nome p/ Lista\n"
-            "- c2.CMEmpCod: Identificação da Empresa\n\n"
-            "FILTRO ATUAL (WHERE/HAVING):\n"
-            f"  c2.CMEmpCod = '{emp}'\n"
-            "  AND c3.CRMov3VlAb > 0\n"
-            "  AND c3.CRMov3Flag = 'A'\n"
-            "  AND c2.CRMov2Flag IN ('A','F')\n"
-            f"  {having}"
+            "TABELAS: CRMOV3, CRMOV2\n"
+            "REGRA: Parcelas em aberto (Flag 'A') por cliente.\n"
+            "FILTRO ATRASO: " + atraso
         )
+
+    def get_current_query(self):
+        """Gera a query SQL de cobrança em tempo real com filtros de atraso dinâmicos."""
+        emp = self.config_db.get("empresa", "01")
+        f_atr = self.combo_atraso.get()
+        having = ""
+        if f_atr == "Até 30 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 30"
+        elif f_atr == "Até 60 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 60"
+        elif f_atr == "Até 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) <= 90"
+        elif f_atr == "Superior a 90 dias": having = "HAVING MAX(DATEDIFF(day, c3.CRMov3DtaV, GETDATE())) > 90"
+
+        return f"""SELECT 
+    c2.CRMov2CodC as CodC, MAX(c2.CRMov2DesC) as Nome, 
+    COUNT(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN 1 END) as QtdAtraso,
+    SUM(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN c3.CRMov3VlAb ELSE 0 END) as ValorAtraso,
+    SUM(CASE WHEN c3.CRMov3DtaV >= CAST(GETDATE() AS DATE) THEN c3.CRMov3VlAb ELSE 0 END) as ValorAVencer,
+    SUM(c3.CRMov3VlAb) as ValorTotal,
+    MIN(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN c3.CRMov3DtaV END) as DtaAtraso,
+    MAX(CASE WHEN c3.CRMov3DtaV < CAST(GETDATE() AS DATE) THEN DATEDIFF(day, c3.CRMov3DtaV, GETDATE()) ELSE 0 END) as DiasAtraso
+FROM crmov3 c3
+INNER JOIN crmov2 c2 ON c3.CMEmpCod = c2.CMEmpCod AND c3.CMFilCod = c2.CMFilCod AND c3.CRMovDta = c2.CRMovDta AND c3.CRMovSeq = c2.CRMovSeq
+WHERE c2.CMEmpCod = '{emp}' AND c3.CRMov3VlAb > 0 AND c3.CRMov3Flag = 'A' AND c2.CRMov2Flag IN ('A','F') AND c2.CRMov2CodC <> 1
+GROUP BY c2.CRMov2CodC {having}
+ORDER BY ValorAtraso DESC"""
 
     def ordenar_por(self, col, reverse):
         data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
@@ -4175,11 +5484,6 @@ class CobrancaClienteWindow(BaseWindow):
             fmt(s_atraso), fmt(s_vencer), fmt(s_total), "", ""
         ))
 
-    def on_double_click(self, event):
-        item_id = self.tree.identify_row(event.y)
-        if not item_id: return
-        vals = self.tree.item(item_id)['values']
-        self.hub.abrir_modulo_detalhes_cobranca(vals[0], vals[1])
 
     def exportar_pdf(self): pass
     def exportar_excel(self): pass
@@ -4318,12 +5622,11 @@ class ExcluirClientesInativosWindow(BaseWindow):
         self.btn_excluir = ctk.CTkButton(self.filter_frame, text="🗑️ EXCLUIR DEFINITIVAMENTE", command=self.confirmar_exclusao, fg_color="#D32F2F", hover_color="#B71C1C", width=220, font=("Arial", 13, "bold"))
         self.btn_excluir.pack(side="right", padx=0)
 
-        # --- NOVO PADRAO: Usar configurar_grid ---
-        cols = ("Rank", "Cod", "Nome", "UltVenc", "VlAb", "MedMensal", "Status")
-        heads = ("🏆 #", "🔑 Código", "👤 Nome", "📅 Último Vencimento", "💰 Valor em Aberto", "📈 Média", "🔘")
-        # Larguras otimizadas e stretch (Coluna Det removida conforme pedido)
-        wids = (50, 100, 480, 155, 180, 140, 180)
-        aligns = ("center", "center", "w", "center", "e", "e", "center")
+        # --- PADRAO OURO: Usar configurar_grid ---
+        cols = ("Rank", "Cod", "Nome", "Det", "UltVenc", "VlAb", "MedMensal", "Status")
+        heads = ("🏆 #", "🔑 Código", "👤 Nome", "📋", "📅 Último Vencimento", "💰 Valor em Aberto", "📈 Média", "🔘")
+        wids = (50, 100, 480, 50, 155, 180, 140, 180)
+        aligns = ("center", "center", "w", "center", "center", "e", "e", "center")
         self.configurar_grid(cols, heads, wids, aligns)
         
         # 1. Ocultar o tree_totais da Base que está poluindo o rodapé (Solicitado: quadrado vermelho)
@@ -4340,9 +5643,9 @@ class ExcluirClientesInativosWindow(BaseWindow):
         self.tree.column("Nome", stretch=True)
         self.tree.column("Status", stretch=True)
 
-        # 1. Clique Simples: Apenas seleciona (Comportamento padrão para não quebrar a ordenação)
-        # 2. Duplo Clique: Abre as parcelas
-        self.tree.bind("<Double-1>", self.on_double_click_tree) 
+        # 1. Clique Simples: Abre as parcelas automaticamente (Standard Ouro)
+        self.tree.bind("<Button-1>", self.on_click_tree_standard) 
+        self.tree.bind("<Double-1>", self.on_click_tree_standard) 
 
         # Labels de Totais e Status (Rodapé)
         self.lbl_vlr_geral_parcelas = ctk.CTkLabel(self.bottom_bar, text="", font=("Arial", 13, "bold"), text_color="#1565C0")
@@ -4421,22 +5724,38 @@ class ExcluirClientesInativosWindow(BaseWindow):
             self.tree.focus(children[0])
 
     def get_sql_summary(self):
-        emp = self.config_db.get("empresa", "01")
         return (
-            "TABELAS:\n"
-            "- CRCLI c (Cadastro Principal Clientes)\n"
-            "- CRMOV2 c2 (Vendas / Documentos / Cabeçalho)\n"
-            "- CRMOV3 c3 (Item Parcela / Vencimentos)\n\n"
-            "CAMPOS PARA ANÁLISE:\n"
-            "- c.CRCliAti: Identificador de Bloqueio ('D')\n"
-            "- c3.CRMov3DtaV: Datas de Movimentação/Vencimento\n"
-            "- c3.CRMov3VlAb: Status de Pagamento (Dívida)\n\n"
-            "FILTRO SELEÇÃO INATIVOS (WHERE/HAVING):\n"
-            f"  CMEmpCod = '{emp}'\n"
-            "  - CANDIDATO 1: Bloqueados no sistema (D)\n"
-            "  - CANDIDATO 2: Inativos s/ Dívida há > 1 Ano\n"
-            "  - CANDIDATO 3: Com Dívida em Aberto há > 2 Anos"
+            "TABELAS: CRCLI, CRMOV2, CRMOV3\n"
+            "REGRA: Clientes bloqueados ou sem movimentação há > 1 ano.\n"
+            "OPERAÇÃO: Exclusão em cascata (Histórico -> Notas -> Cadastro)."
         )
+
+    def get_current_query(self):
+        """Retorna a query SQL de análise de inatividade (Executada no processamento)."""
+        emp = self.config_db.get("empresa", "01")
+        return f"""SELECT 
+    c.CRCliCod, 
+    c.CRCliDes, 
+    MAX(c3.CRMov3DtaV) as UltimaDataGeral,
+    c.CRCliAti,
+    SUM(ISNULL(c3.CRMov3VlAb, 0)) as TotalAberto,
+    MAX(CASE WHEN ISNULL(c3.CRMov3VlAb, 0) > 0 THEN c3.CRMov3DtaV ELSE NULL END) as UltimaDataAberta
+FROM crcli c
+LEFT JOIN crmov2 c2 ON c.CRCliCod = c2.CRMov2CodC AND c.CMEmpCod = c2.CMEmpCod AND c2.CRMov2Flag IN ('A','F')
+LEFT JOIN crmov3 c3 ON c2.CMEmpCod = c3.CMEmpCod AND c2.CMFilCod = c3.CMFilCod AND c2.CRMovDta = c3.CRMovDta AND c2.CRMovSeq = c3.CRMovSeq
+WHERE c.CMEmpCod = '{emp}'
+GROUP BY c.CRCliCod, c.CRCliDes, c.CRCliAti
+HAVING 
+    c.CRCliAti = 'D'
+    OR (
+        MAX(c3.CRMov3DtaV) < DATEADD(year, -1, GETDATE())
+        AND SUM(ISNULL(c3.CRMov3VlAb, 0)) = 0
+        AND MAX(c3.CRMov3DtaV) IS NOT NULL
+    )
+    OR (
+        MAX(CASE WHEN ISNULL(c3.CRMov3VlAb, 0) > 0 THEN c3.CRMov3DtaV ELSE NULL END) < DATEADD(year, -2, GETDATE())
+        AND SUM(ISNULL(c3.CRMov3VlAb, 0)) > 0
+    )"""
 
     def carregar_dados(self):
         try:
@@ -4599,7 +5918,7 @@ class ExcluirClientesInativosWindow(BaseWindow):
             else:
                 status_txt = "INATIVO > 1 ANO"
             
-            it = self.tree.insert("", "end", values=(total, cod_c, nome_c, dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
+            it = self.tree.insert("", "end", values=(total, cod_c, nome_c, " 🔍 VER ", dta_str, vl_txt, med_txt, status_txt), tags=tuple(tags))
             if total % 10 == 0:
                  self.tree.see(it)
                  self.update_idletasks()
@@ -4610,8 +5929,8 @@ class ExcluirClientesInativosWindow(BaseWindow):
         if target_lbl:
              target_lbl.configure(text=txt_resumo)
 
-    def on_double_click_tree(self, event):
-        """Gatilho para duplo clique na linha do cliente."""
+    def on_click_tree_standard(self, event):
+        """Gatilho para clique na linha do cliente (Conforme Standard Ouro)."""
         item_id = self.tree.identify_row(event.y)
         if not item_id: return
         
@@ -4619,7 +5938,7 @@ class ExcluirClientesInativosWindow(BaseWindow):
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
 
-        # Abrir tela de detalhes (Apenas no Duplo Clique)
+        # Abrir tela de detalhes
         self.abrir_detalhes_parcelas(item_id)
 
     def abrir_detalhes_parcelas(self, item_id=None):
@@ -4942,6 +6261,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     config = {"nome_usuario": "Operador", "servidor": r"servidor\sqlexpress", "banco": "msinfor", "usuario_bd": "sa", "senha_bd": "Mabelu2011"}
     
+    # Carregar configuração persistente (CFG_ACESSO) se disponível
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config.update(json.load(f))
+        except: pass
+
     if args.servidor: config["servidor"] = args.servidor
     if args.banco: config["banco"] = args.banco
     if args.usuario: config["usuario_bd"] = args.usuario
