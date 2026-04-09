@@ -358,9 +358,19 @@ class BaseWindow(ctk.CTkFrame):
             self.lbl_total_regs.configure(text=f"Total: {len(items)} registros")
 
     def get_sql_summary(self):
-        return "Instrução SQL não definida para esta tela."
-
-
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
+        return (
+            f"--- ESTRUTURA SQL: BASE ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
+        )
     def exportar_excel(self):
         items = self.tree.get_children()
         from tkinter import messagebox
@@ -1291,18 +1301,19 @@ class AnaliseVendasWindow(ctk.CTkFrame):
         return f"SELECT CRMovDta, CRMov2CHor, CRMov2VlrO FROM crmov2 WHERE CRMovDta IS NOT NULL AND CRMov2Flag IN ('A', 'F'){where_extra} ORDER BY CRMovDta"
 
     def get_sql_summary(self):
-        ano = self.combo_ano.get()
-        mes = self.combo_mes.get()
-        visao = self.combo_visao.get()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELA:\n- CRMOV2 (Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- CRMovDta: Data da Operação\n- CRMov2CHor: Hora da Operação\n"
-            "- CRMov2VlrO: Valor Bruto da Venda\n- CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "REGRA DE NEGÓCIO:\n- Filtro inicial: CRMov2Flag IN ('A', 'F')\n"
-            "- Filtros Dinâmicos (Desta vez via Pandas): " + f"Ano={ano}, Mês={mes}, Visão={visao}"
+            f"--- ESTRUTURA SQL: ANALISEVENDAS ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
-
     def carregar_dados(self):
         try:
             conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config['servidor']};DATABASE={self.config['banco']};UID={self.config['usuario_bd']};PWD={self.config['senha_bd']}"
@@ -1708,6 +1719,10 @@ class MainHub(ctk.CTk):
                                            command=self.abrir_vendas_quantidade, fg_color="#1E88E5", hover_color="#1565C0")
         self.btn_vendas_qtd.pack(pady=8, padx=15)
 
+        self.btn_volume_vendas_ticket = ctk.CTkButton(self.col3_frame, text="📈 Volume Vendas (Ticket Médio)", width=btn_width, height=45, font=("Arial", 13, "bold"), 
+                                           command=self.abrir_volume_vendas_ticket, fg_color="#1E88E5", hover_color="#1565C0")
+        self.btn_volume_vendas_ticket.pack(pady=8, padx=15)
+
         # --- OUTRA COLUNA VAZIA ( placeholder ) ---
         f4 = ctk.CTkFrame(self.modules_frame, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#E2E8F0")
         f4.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
@@ -1966,6 +1981,7 @@ class MainHub(ctk.CTk):
     def abrir_cobranca(self): self.abrir_modulo(CobrancaClienteWindow)
     def abrir_excluir_inativos(self): self.abrir_modulo(ExcluirClientesInativosWindow)
     def abrir_vendas_quantidade(self): self.abrir_modulo(AnaliseVendasQuantidadeWindow)
+    def abrir_volume_vendas_ticket(self): self.abrir_modulo(VolumeVendasTicketWindow)
 
     def abrir_modulo_detalhes_inativos(self, cod, nome):
         if hasattr(self, "modulo_atual") and self.modulo_atual:
@@ -2183,53 +2199,19 @@ ORDER BY c2.CRMovDta DESC"""
         messagebox.showinfo("Sucesso", "COMANDO SQL COPIADO PARA O CLIPBOARD")
 
     def get_sql_summary(self):
-        de_raw = self.ent_de.get().strip()
-        ate_raw = self.ent_ate.get().strip()
-        
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "--- ESTRUTURA SQL (RESUMO) ---\n"
-            "TABELAS:\n"
-            "- CRMOV2 c2 (Cabeçalho de Vendas do Concentrador)\n"
-            "- CRMOV4 c4 (Itens de Venda do Concentrador)\n"
-            "- POCF1 s (Movimentos de Caixa/Vendas SIL)\n"
-            "- CEPRO p (Cadastro de Produtos)\n\n"
-            
-            "CAMPOS UTILIZADOS:\n"
-            "- c2.CRMovDta / c2.CRMovSeq: Chave Primária de Venda\n"
-            "- c4.CRMov4Ite: Sequencial do Bico/Item\n"
-            "- c4.CEProCod: Código do Produto (Combustível/Diversos)\n"
-            "- p.CEProDes: Descrição do Produto\n"
-            "- c4.CRMov4Qtd: Quantidade Lida do Concentrador\n"
-            "- c4.CRMov4VlrA: Preço Unitário de Tabela\n\n"
-            
-            "FILTRO ATUAL (WHERE):\n"
-            f"  c2.CMEmpCod = (Posto Selecionado)\n"
-            f"  AND CAST(c2.CRMovDta AS DATE) BETWEEN '{de_raw}' AND '{ate_raw}'\n"
-            "  AND (\n"
-            "      -- DETECTA REGISTROS NÃO LANÇADOS (BATIMENTO TÉCNICO):\n"
-            "      -- POEmpCod   = CMEmpCod\n"
-            "      -- POCF1DtaMo = CRMovDta\n"
-            "      -- POCF1SeqMo = CRMovSeq\n"
-            "      -- POCF1IteMo = CRMov4Ite\n"
-            "      NOT EXISTS (SELECT 1 FROM POCF1 s \n"
-            "          WHERE s.POEmpCod = c2.CMEmpCod \n"
-            "            AND s.POCF1DtaMo = c2.CRMovDta \n"
-            "            AND s.POCF1SeqMo = c2.CRMovSeq \n"
-            "            AND s.POCF1IteMo = c4.CRMov4Ite)\n"
-            "      OR \n"
-            "      -- DETECTA REGISTROS REPLICADOS/DUPLICADOS\n"
-            "      (SELECT COUNT(*) FROM POCF1 s2 \n"
-            "          WHERE s2.POEmpCod = c2.CMEmpCod \n"
-            "            AND s2.POCF1DtaMo = c2.CRMovDta \n"
-            "            AND s2.POCF1SeqMo = c2.CRMovSeq \n"
-            "            AND s2.POCF1IteMo = c4.CRMov4Ite) > 1\n"
-            "  )\n\n"
-            
-            "REGRA DE AUDITORIA:\n"
-            "  Batimento cruzado entre CRMov4 e POCF1 usando:\n"
-            "  Empresa, Data, Sequência e Item."
+            "--- ESTRUTURA SQL: CONCILIAÇÃO VENDAS X CONCENTRADOR ---\n"
+            "TABELAS PRINCIPAIS: POCF1 (Cupons Concentrador) e CRMov2/4 (Vendas ERP)\n"
+            "RELACIONAMENTOS:\n"
+            "- Cruzamento de Cupons registrados fisicamente X notas processadas no ERP.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Data, Sequência, Cliente, Produto, Quantidade e Divergências de Batimento.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados da tela por Data/Período do caixa e Empresa.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordem Cronológica por Emissão (DESC)"
         )
-
     def carregar_divergencias(self):
         try:
             import pyodbc
@@ -2311,6 +2293,7 @@ ORDER BY c2.CRMovDta DESC"""
             
             self.update() # Força a pintura do overlay antes da query pesada
             
+            self.ultima_query_bruta = sql.replace("?", f"'{posto_id}'", 1).replace("?", f"'{de}'", 1).replace("?", f"'{ate}'", 1)
             cur.execute(sql, (posto_id, de, ate))
             rows = cur.fetchall()
             
@@ -2628,20 +2611,19 @@ class ConciliacaoPOCF1CRMOV4Window(BaseWindow):
         messagebox.showinfo("Informação", f"Copiado ID da Tela: {self.id_str}")
 
     def get_sql_summary(self):
-        de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "--- ESTRUTURA SQL (AUDITORIA POCF1 x CRMov4) ---\n"
-            "ORIGEM: POCF1 (Registros de Caixa SIL)\n"
-            "DESTINO: CRMov4 (Itens do Concentrador Técnico)\n\n"
-            "FILTRO PRINCIPAL:\n"
-            f"  Data do Teste (POCF1Tst) entre '{de_raw}' e '{ate_raw}'\n"
-            "  Filtro Adicional: POCF1SeqMo > 0\n\n"
-            "CHAVES DE BATIMENTO (JOIN):\n"
-            "- CRMovDta  = POCF1DtaMo\n"
-            "- CRMovSeq  = POCF1SeqMo\n"
-            "- CRMov4Ite = POCF1IteMo"
+            f"--- ESTRUTURA SQL: CONCILIACAOPOCF1CRMOV4 ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def abrir_calendario(self, entry_target):
         pop = ctk.CTkToplevel(self); pop.title("📅 Data"); pop.geometry("320x400"); pop.attributes("-topmost", True); pop.grab_set()
         import calendar; hoje = date.today(); cal_state = {"mes": hoje.month, "ano": hoje.year}
@@ -3330,8 +3312,19 @@ class TotCompraVendaWindow(BaseWindow):
         return sql
 
     def get_sql_summary(self):
-        return self.get_current_query()
-
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
+        return (
+            f"--- ESTRUTURA SQL: TOTCOMPRAVENDA ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
+        )
     def carregar_dados(self):
         try:
             import pyodbc
@@ -3527,6 +3520,7 @@ class TabelaPostoWindow(BaseWindow):
                     WHERE v.POEmpCod = ?
                     ORDER BY v.POMBoCod, v.POBomCod
                 """
+                self.ultima_query_bruta = sql.replace("?", str(posto_id))
                 cur.execute(sql, (posto_id,))
 
             # --- CASO ESPECIAL: ENTRADA NF (POENF) com JOIN p/ Nome Fornecedor e Tanque ---
@@ -3542,6 +3536,7 @@ class TabelaPostoWindow(BaseWindow):
                     WHERE t.POEmpCod = ?
                     ORDER BY t.PODtaMov DESC
                 """
+                self.ultima_query_bruta = sql.replace("?", str(posto_id))
                 cur.execute(sql, (posto_id,))
 
             # --- CASO GERAL: Sem JOINs (Tabelas Simples) ---
@@ -3883,6 +3878,21 @@ class LMCVendaBombaWindow(BaseWindow):
         
         self.after(200, self.carregar_dados)
 
+    def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
+        return (
+            "--- ESTRUTURA SQL: LMC VENDA BOMBA ---\n"
+            "TABELAS PRINCIPAIS: POLMC1 (Vendas), POBom (Bombas), POTnq (Tanques)\n"
+            "RELACIONAMENTOS:\n"
+            "- LMC1 JOIN Bombas (POBomCod) JOIN Tanques (POTnqCod)\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Volumem Vendido, Totalizadores Iniciais/Finais por Bomba.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtro de Bomba Opcional, Período de Data e Posto Logado.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Data (Decrescente) e Tanque (Crescente)"
+        )
+
     def carregar_dados(self):
         try:
             import pyodbc
@@ -4020,6 +4030,21 @@ class LMCEstoqueWindow(BaseWindow):
         self.configurar_grid(cols, heads, wids, alns)
         
         self.after(200, self.carregar_dados)
+
+    def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
+        return (
+            "--- ESTRUTURA SQL: LMC ESTOQUE / ENTRADA ---\n"
+            "TABELAS PRINCIPAIS: POLMC2 (Estoques), POTnq (Tanques)\n"
+            "RELACIONAMENTOS:\n"
+            "- LMC2 LEFT JOIN Tanques. Subqueries em POENF (Compras) e POLMC1 (Vendas).\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Volumes Iniciais, Finais, Compras, Vendas, Ajustes por Tanque.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtro de Tanque, Período e ID do Posto Global.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Data (Decrescente) e Tanque (Crescente)"
+        )
 
     def carregar_tanques(self):
         try:
@@ -4197,6 +4222,21 @@ class LMCResumoWindow(BaseWindow):
         self.after(500, self.carregar_produtos)
         self.after(800, self.carregar_dados)
 
+    def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
+        return (
+            "--- ESTRUTURA SQL: LMC RESUMO PERÍODO ---\n"
+            "TABELAS PRINCIPAIS: POLMC3 (Resumo Combustíveis)\n"
+            "RELACIONAMENTOS:\n"
+            "- LEFT JOIN POTCo c ON l.POLMC3TCoC = c.POTCoCod\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Entradas, Vendas, Ajustes e Saldo de Estoque Dinâmico.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtro de Combustível (Tela) e Posto logado.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Data (Decrescente) e Combustível (Crescente)"
+        )
+
     def carregar_produtos(self):
         try:
             import pyodbc
@@ -4248,6 +4288,9 @@ class LMCResumoWindow(BaseWindow):
                 GROUP BY l.PODtaMov, l.POLMC3TCoC
                 ORDER BY l.PODtaMov DESC, l.POLMC3TCoC ASC
             """
+            self.ultima_query_bruta = sql.replace("?", f"'{posto_id}'", 1).replace("?", f"'{de}'", 1).replace("?", f"'{ate}'", 1)
+            if filtro_prod: self.ultima_query_bruta = self.ultima_query_bruta.replace("?", f"'{prod_cod}'", 1)
+            
             cur.execute(sql, params)
             rows = cur.fetchall()
 
@@ -4535,24 +4578,19 @@ class CaixaFrentistaResumoWindow(BaseWindow):
             print(f"Erro ao abrir detalhes: {e}")
 
     def get_sql_summary(self):
-        """Retorna o resumo técnico da lógica de negócio desta tela."""
-        frentista = self.combo_frentista.get()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "--- ESTRUTURA SQL: RESUMO CAIXA FRENTISTA ---\n"
-            "TABELA PRINCIPAL: POCF2 (Resumo do Caixa)\n"
+            f"--- ESTRUTURA SQL: CAIXAFRENTISTARESUMO ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
             "RELACIONAMENTOS:\n"
-            "- POCF3 (Totais do Caixa): Subquery para somar VlrFi (Valor Final).\n\n"
-            "MÉTRICAS:\n"
-            "- VALOR FINAL (VlrFi): Somatório de POCF3VlrFi vinculado ao Usuário e Timestamp.\n"
-            "- DIFERENÇA (VlrDi): Diferença entre o Valor Manual (VlrMa) e o calculado na POCF3.\n\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
             "FILTROS APLICADOS:\n"
-            f"- Posto: (ID Selecionado no Hub)\n"
-            f"- Período: {self.ent_de.get()} até {self.ent_ate.get()}\n"
-            f"- Frentista: {frentista if frentista != 'Todos' else 'Todos os Frentistas'}\n\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
             "ORDENAÇÃO:\n"
-            "- POCF2Tst DESC (Lançamentos mais recentes primeiro)"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Gera o comando SQL técnico com base nos filtros atuais da UI."""
         try:
@@ -4643,6 +4681,7 @@ ORDER BY p.POCF2Tst DESC"""
 
             for item in self.tree.get_children(): self.tree.delete(item)
             total_calculado = 0.0
+            total_desconto = 0.0
             
             for r in rows:
                 usu = str(r[0]).strip()
@@ -4654,6 +4693,7 @@ ORDER BY p.POCF2Tst DESC"""
                 dcx = r[16]
                 
                 total_calculado += v_fi
+                total_desconto += v_dec
                 
                 ab_fmt = tst_ab.strftime("%d/%m/%Y %H:%M") if hasattr(tst_ab, "strftime") and tst_ab.year < 9999 else "N/A"
                 fe_fmt = tst_fe.strftime("%d/%m/%Y %H:%M") if hasattr(tst_fe, "strftime") and tst_fe.year < 9999 else "ABER"
@@ -4676,6 +4716,7 @@ ORDER BY p.POCF2Tst DESC"""
             row_tot = [""] * 12
             row_tot[0] = f"REGISTROS: {len(rows)}"
             row_tot[2] = f"{total_calculado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            row_tot[7] = f"{total_desconto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             self.tree_totais.insert("", "end", values=tuple(row_tot))
             
             self.re_zebrar(); conn.close()
@@ -4834,17 +4875,19 @@ class CaixaFrentistaItensWindow(BaseWindow):
         self.destroy()
 
     def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "--- DETALHAMENTO DE ITENS (POCF1) ---\n"
-            "FILTRO APLICADO:\n"
-            f"- Frentista: {self.usu_filter}\n"
-            f"- Fechamento (Timestamp): {self.tst_filter}\n"
-            f"- Filtro Tipo Mov: {self.combo_tipmo.get()}\n"
-            "- Posto: (ID Selecionado no Hub)\n\n"
-            "VÍNCULO TÉCNICO:\n"
-            "POCF1.POCF1TstFe = POCF2.POCF2Tst (Referência ao momento da abertura do turno)"
+            f"--- ESTRUTURA SQL: CAIXAFRENTISTAITENS ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
         tst_seg = self.tst_filter[:19]
@@ -4978,39 +5021,19 @@ class AnaliseProdutoWindow(BaseWindow):
 
     
     def get_sql_summary(self):
-        ano = self.combo_ano.get()
-        mes = self.combo_mes.get()
-        metrica = self.combo_metrica.get()
-        limite = self.combo_limite.get().replace("Top ", "")
-        pesquisa = self.txt_pesquisa.get().strip()
-        
-        where_mes = f"AND MONTH(c4.CRMovDta) = {self.meses_ext.index(mes)}" if mes != "Todos" else ""
-        where_pesquisa = f"AND p.CEProDes LIKE '%{pesquisa}%'" if pesquisa else ""
-
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "--- ESTRUTURA SQL (RESUMO) ---\n"
-            "TABELAS:\n"
-            "- CRMOV4 c4 (Itens de Venda)\n"
-            "- CRMOV2 c2 (Cabeçalhos de Venda)\n"
-            "- CEPRO p (Cadastro de Produtos)\n\n"
-            
-            "CÁLCULOS TÉCNICOS (MÉTRICAS):\n"
-            "- VALOR VENDA: (Qtd * VlrUnit) - Desc - VDV - VAF\n"
-            "- VALOR CUSTO: (c4.CRMov4CusP * Qtd)\n"
-            "- LUCRO: (Venda - Custo)\n\n"
-            
-            "FILTRO ATUAL (WHERE):\n"
-            "  c2.CMEmpCod = (Posto Selecionado)\n"
-            "  AND c2.CRMov2Flag IN ('A', 'F')\n"
-            f"  AND YEAR(c4.CRMovDta) = '{ano}'\n"
-            f"  {where_mes}\n"
-            f"  {where_pesquisa}\n\n"
-            
-            "ORDENAÇÃO E LIMITE:\n"
-            f"  {metrica} DESC\n"
-            f"  TOP {limite}"
+            f"--- ESTRUTURA SQL: ANALISEPRODUTO ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Monta o SQL real que será executado na análise de produtos, com filtros dinâmicos."""
         ano = self.combo_ano.get()
@@ -5440,7 +5463,10 @@ class AnaliseVendasQuantidadeWindow(BaseWindow):
                 totais = ano_totals
                 
                 if tipo_grafico == "Barras":
-                    elem = ax.bar(anos_labels, totais, color="#1E88E5", width=0.5)
+                    # Cores vibrantes para cada coluna
+                    cores_vibrantes = ["#1E88E5", "#D81B60", "#43A047", "#FFB300", "#8E24AA", "#00ACC1", "#F4511E", "#7B1FA2"]
+                    cores_plot = [cores_vibrantes[i % len(cores_vibrantes)] for i in range(len(anos_labels))]
+                    elem = ax.bar(anos_labels, totais, color=cores_plot, width=0.5)
                     for rect in elem:
                         val = rect.get_height()
                         ax.annotate(format_val(val), xy=(rect.get_x() + rect.get_width() / 2, val),
@@ -5516,6 +5542,283 @@ class AnaliseVendasQuantidadeWindow(BaseWindow):
 
 # [Bloco __main__ movido para o final definitivo do arquivo]
 
+class VolumeVendasTicketWindow(BaseWindow):
+    def __init__(self, parent, config):
+        super().__init__(parent, "Volume Vendas & Ticket Médio", "VOL_VENDAS_TICKET")
+        self.config_db = config
+        self.rows_cache = []
+        self.anos_comp = 3 
+
+        # --- BARRA DE FILTROS ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="top", fill="x", padx=20, pady=5)
+
+        ctk.CTkLabel(self.filter_frame, text="Comparar:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_comp = ctk.CTkComboBox(self.filter_frame, values=["2 Anos", "3 Anos", "4 Anos", "5 Anos"], width=100, command=self.mudar_comp)
+        self.combo_comp.pack(side="left", padx=5); self.combo_comp.set("3 Anos")
+
+        ctk.CTkLabel(self.filter_frame, text="Mês:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.meses_ext = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        self.combo_mes = ctk.CTkComboBox(self.filter_frame, values=self.meses_ext, width=120)
+        self.combo_mes.pack(side="left", padx=5); self.combo_mes.set("Todos")
+
+        ctk.CTkLabel(self.filter_frame, text="Métrica:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_metrica = ctk.CTkComboBox(self.filter_frame, values=["Quantidade de Vendas", "Ticket Médio"], width=160, command=lambda _: self.carregar_dados())
+        self.combo_metrica.pack(side="left", padx=5); self.combo_metrica.set("Quantidade de Vendas")
+
+        ctk.CTkLabel(self.filter_frame, text="Gráfico:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_tipo_grafico = ctk.CTkComboBox(self.filter_frame, values=["Barras", "Linhas"], width=100, command=lambda _: self.carregar_dados())
+        self.combo_tipo_grafico.pack(side="left", padx=5); self.combo_tipo_grafico.set("Barras")
+
+        self.var_detalhar = ctk.BooleanVar(value=False)
+        self.check_detalhar = ctk.CTkCheckBox(self.filter_frame, text="Detalhar por Mês", variable=self.var_detalhar, font=("Arial", 11, "bold"), command=self.carregar_dados)
+        self.check_detalhar.pack(side="left", padx=10)
+
+        btn_go = ctk.CTkButton(self.filter_frame, text="📊 Analisar", width=100, fg_color="#1E88E5", command=self.carregar_dados)
+        btn_go.pack(side="left", padx=10)
+
+        if hasattr(self, 'tree'): self.tree.pack_forget()
+        
+        # Container Gráficos
+        self.charts_frame = ctk.CTkFrame(self.grid_frame, fg_color="white")
+        self.charts_frame.pack(fill="both", expand=True)
+        self.after(200, self.carregar_dados)
+
+    def mudar_comp(self, val):
+        self.anos_comp = int(val.split(" ")[0])
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            from datetime import date
+            ano_corrente = date.today().year 
+            mes_sel = self.combo_mes.get()
+            
+            where_mes = f"AND MONTH(c2.CRMovDta) = {self.meses_ext.index(mes_sel)}" if mes_sel != "Todos" else ""
+            self.anos_analisados = sorted([ano_corrente - i for i in range(self.anos_comp + 1)])
+            
+            # Condição de ignorar dados absurdos e agrupamento direto em CRMov2
+            sql = f"""
+                SELECT YEAR(c2.CRMovDta) as Ano, MONTH(c2.CRMovDta) as Mes, COUNT(c2.CRMovSeq) as QtdVendas, SUM(c2.CRMov2VlrO) as VlrTotal
+                FROM CRMov2 c2
+                WHERE c2.CRMov2Flag IN ('A', 'F') 
+                  AND YEAR(c2.CRMovDta) BETWEEN {min(self.anos_analisados)} AND {ano_corrente}
+                  AND c2.CRMov2VlrO <= 1000
+                  {where_mes}
+                GROUP BY YEAR(c2.CRMovDta), MONTH(c2.CRMovDta)
+                ORDER BY Ano, Mes
+            """
+            
+            self.ultima_query_bruta = sql
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor(); cur.execute(sql)
+                self.rows_cache = [list(r) for r in cur.fetchall()]
+            
+            self.renderizar_graficos()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro BI", str(e))
+
+    def renderizar_graficos(self):
+        for w in self.charts_frame.winfo_children(): w.destroy()
+        if not self.rows_cache: 
+            ctk.CTkLabel(self.charts_frame, text="🔍 Nenhum dado encontrado para os filtros selecionados.", font=("Arial", 14, "bold")).pack(pady=50)
+            return
+        try:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            from datetime import date
+            
+            fig, ax = plt.subplots(figsize=(10, 5))
+            detalhar_mes = self.var_detalhar.get()
+            tipo_grafico = self.combo_tipo_grafico.get()
+            metrica_sel = self.combo_metrica.get()
+            
+            # Cores vibrantes premium
+            cores_vibrantes = ["#1E88E5", "#D81B60", "#43A047", "#FFB300", "#8E24AA", "#00ACC1", "#F4511E", "#7B1FA2", "#2E7D32", "#C62828"]
+
+            def format_val(val): 
+                if metrica_sel == "Ticket Médio": return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                return f"{int(val):,}".replace(",", ".")
+
+            def format_int(val): return f"{int(val):,}".replace(",", ".")
+            def format_moeda(val): return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            elements_list = []
+            labels_info = []
+            num_anos = len(self.anos_analisados)
+
+            hoje = date.today()
+            ano_atual = hoje.year
+            mes_limite = hoje.month - 1
+            if mes_limite <= 0: mes_limite = 1 
+
+            ano_totals = []
+            ano_labels_rich = []
+            
+            for i, ano in enumerate(self.anos_analisados):
+                if metrica_sel == "Ticket Médio":
+                    total_vol = sum(r[2] for r in self.rows_cache if r[0] == ano)
+                    total_vlr = sum(r[3] for r in self.rows_cache if r[0] == ano)
+                    total_real = total_vlr / total_vol if total_vol > 0 else 0
+                else:
+                    total_real = sum(r[2] for r in self.rows_cache if r[0] == ano)
+                
+                ano_totals.append(total_real)
+                
+                perc_str = ""
+                if i > 0:
+                    prev_ano = self.anos_analisados[i-1]
+                    # Comparação literal para o delta
+                    if metrica_sel == "Ticket Médio":
+                        v_atual = total_real
+                        v_prev_vol = sum(r[2] for r in self.rows_cache if r[0] == prev_ano)
+                        v_prev_vlr = sum(r[3] for r in self.rows_cache if r[0] == prev_ano)
+                        v_prev = v_prev_vlr / v_prev_vol if v_prev_vol > 0 else 0
+                    else:
+                        v_atual = total_real
+                        v_prev = sum(r[2] for r in self.rows_cache if r[0] == prev_ano)
+
+                    if ano == ano_atual:
+                        # Para o ano atual, comparamos YTD
+                        if metrica_sel == "Ticket Médio":
+                            v_at_vol = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] <= mes_limite)
+                            v_at_vlr = sum(r[3] for r in self.rows_cache if r[0] == ano and r[1] <= mes_limite)
+                            v_at_comp = v_at_vlr / v_at_vol if v_at_vol > 0 else 0
+                            v_pr_vol = sum(r[2] for r in self.rows_cache if r[0] == prev_ano and r[1] <= mes_limite)
+                            v_pr_vlr = sum(r[3] for r in self.rows_cache if r[0] == prev_ano and r[1] <= mes_limite)
+                            v_pr_comp = v_pr_vlr / v_pr_vol if v_pr_vol > 0 else 0
+                        else:
+                            v_at_comp = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] <= mes_limite)
+                            v_pr_comp = sum(r[2] for r in self.rows_cache if r[0] == prev_ano and r[1] <= mes_limite)
+                        
+                        if v_pr_comp > 0:
+                            diff = ((v_at_comp - v_pr_comp) / v_pr_comp) * 100
+                            perc_str = f" ({'+' if diff >= 0 else ''}{diff:.1f}%)"
+                    else:
+                        if v_prev > 0:
+                            diff = ((v_atual - v_prev) / v_prev) * 100
+                            perc_str = f" ({'+' if diff >= 0 else ''}{diff:.1f}%)"
+                
+                ano_labels_rich.append(f"{ano}: {format_val(total_real)}{perc_str}")
+
+            if detalhar_mes:
+                meses_labels = self.meses_ext[1:13] 
+                x = np.arange(len(meses_labels))
+                width = 0.8 / num_anos
+                
+                for i, ano in enumerate(self.anos_analisados):
+                    data_meses = []
+                    for m_idx in range(1, 13):
+                        if metrica_sel == "Ticket Médio":
+                            q = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] == m_idx)
+                            v = sum(r[3] for r in self.rows_cache if r[0] == ano and r[1] == m_idx)
+                            val = v / q if q > 0 else 0
+                        else:
+                            val = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] == m_idx)
+                        data_meses.append(val)
+                    
+                    label_l = ano_labels_rich[i]
+                    cor_ano = cores_vibrantes[i % len(cores_vibrantes)]
+                    if tipo_grafico == "Barras":
+                        offset = (i - (num_anos-1)/2) * width
+                        elem = ax.bar(x + offset, data_meses, width, label=label_l, color=cor_ano)
+                    else:
+                        elem = ax.plot(x, data_meses, marker='o', linewidth=2, label=label_l, color=cor_ano)
+                    
+                    elements_list.append(elem)
+                
+                ax.set_xticks(x)
+                ax.set_xticklabels(meses_labels, rotation=45, fontsize=9)
+                ax.legend(fontsize=11, loc='upper left', bbox_to_anchor=(1, 1))
+                labels_info = meses_labels
+            else:
+                anos_labels = [str(a) for a in self.anos_analisados]
+                totais = ano_totals
+                
+                if tipo_grafico == "Barras":
+                    cores_plot = [cores_vibrantes[idx % len(cores_vibrantes)] for idx in range(len(anos_labels))]
+                    elem = ax.bar(anos_labels, totais, color=cores_plot, width=0.5)
+                    for rect in elem:
+                        val = rect.get_height()
+                        ax.annotate(format_val(val), xy=(rect.get_x() + rect.get_width() / 2, val),
+                                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=9, fontweight="bold")
+                    ax.set_xticklabels(ano_labels_rich, rotation=15, fontsize=9)
+                else:
+                    elem = ax.plot(anos_labels, totais, marker='o', color=cores_vibrantes[0], linewidth=3)
+                    for i, v in enumerate(totais):
+                        ax.annotate(format_val(v), (anos_labels[i], v), xytext=(0, 10), textcoords="offset points", ha='center', fontsize=9, fontweight="bold")
+                    ax.set_xticklabels(ano_labels_rich, rotation=15, fontsize=9)
+                
+                elements_list.append(elem)
+                labels_info = anos_labels
+
+            ax.set_title(f"Evolução de {metrica_sel} ({tipo_grafico})", fontsize=12, fontweight="bold")
+            
+            annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points",
+                               bbox=dict(boxstyle="round", fc="white", ec="gray", alpha=0.9),
+                               arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.3"))
+            annot.set_visible(False)
+
+            def get_ticket_data(is_detalhar, ano, extra_idx):
+                if is_detalhar:
+                    m = extra_idx + 1 
+                    q = sum(r[2] for r in self.rows_cache if r[0] == ano and r[1] == m)
+                    v = sum(r[3] for r in self.rows_cache if r[0] == ano and r[1] == m)
+                else:
+                    q = sum(r[2] for r in self.rows_cache if r[0] == ano)
+                    v = sum(r[3] for r in self.rows_cache if r[0] == ano)
+                tk = v / q if q > 0 else 0
+                return q, tk
+
+            def hover(event):
+                if event.inaxes == ax:
+                    found = False
+                    for idx_serie, elem in enumerate(elements_list):
+                        if tipo_grafico == "Barras":
+                            for idx_bar, bar in enumerate(elem):
+                                cont, _ = bar.contains(event)
+                                if cont:
+                                    ano_pt = self.anos_analisados[idx_serie] if detalhar_mes else self.anos_analisados[idx_bar]
+                                    qt, tk = get_ticket_data(detalhar_mes, ano_pt, idx_bar)
+                                    txt = f"Ano: {ano_pt}\nQtd Vendas: {format_int(qt)}\nTicket Médio: {format_moeda(tk)}"
+                                    if detalhar_mes: txt = f"Mês: {labels_info[idx_bar]}\n" + txt
+                                    annot.xy = (bar.get_x() + bar.get_width()/2, bar.get_height())
+                                    annot.set_text(txt)
+                                    annot.set_visible(True); fig.canvas.draw_idle()
+                                    found = True; break
+                        else:
+                            line = elem[0]
+                            cont, ind = line.contains(event)
+                            if cont:
+                                idx_pt = ind['ind'][0]
+                                ano_pt = self.anos_analisados[idx_serie] if detalhar_mes else self.anos_analisados[idx_pt]
+                                qt, tk = get_ticket_data(detalhar_mes, ano_pt, idx_pt)
+                                xdata, ydata = line.get_data()
+                                txt = f"Ano: {ano_pt}\nQtd Vendas: {format_int(qt)}\nTicket Médio: {format_moeda(tk)}"
+                                if detalhar_mes: txt = f"Mês: {labels_info[idx_pt]}\n" + txt
+                                annot.xy = (xdata[idx_pt], ydata[idx_pt])
+                                annot.set_text(txt)
+                                annot.set_visible(True); fig.canvas.draw_idle()
+                                found = True; break
+                        if found: break
+                    if not found and annot.get_visible():
+                        annot.set_visible(False); fig.canvas.draw_idle()
+
+            fig.canvas.mpl_connect("motion_notify_event", hover)
+            ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
+            fig.tight_layout()
+            
+            canvas = FigureCanvasTkAgg(fig, master=self.charts_frame)
+            canvas.draw(); canvas.get_tk_widget().pack(fill="both", expand=True)
+            plt.close(fig)
+        except Exception as e: 
+            print(f"Erro Chart VolumeVendas: {e}")
+            ctk.CTkLabel(self.charts_frame, text=f"❌ Erro ao gerar gráfico: {e}", text_color="red", font=("Arial", 12)).pack(pady=20)
+
+
 
 
 
@@ -5582,22 +5885,19 @@ ORDER BY SUM(CRMov2VlrO) DESC"""
 
     
     def get_sql_summary(self):
-        ano = self.combo_ano.get()
-        mes = self.combo_mes.get()
-        top = self.combo_top.get()
-        where = ["CRMov2Flag IN ('A', 'F')", "CRMovDta IS NOT NULL", "YEAR(CRMovDta) != 9999"]
-        if ano != "Todos": where.append(f"YEAR(CRMovDta) = {int(ano)}")
-        if mes != "Todos": where.append("MONTH(CRMovDta) = (Indice Selecionado)")
-        
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELA:\n- CRMOV2 (Cabeçalhos de Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- CRMov2CodC: Código do Cliente (Agrupamento)\n- CRMov2DesC: Razão Social/Nome do Cliente\n"
-            "- CRMov2VlRO: Valor Bruto da Venda (Soma)\n- CRMovDta: Data da Venda (Filtro Ano/Mês)\n"
-            "- CMEmpCod: Código da Empresa\n- CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "FILTRO ATUAL (WHERE):\n  " + "\n  AND ".join(where) + "\n  AND CRMov2CodC NOT IN (1)\n\n"
-            "AGRUPAMENTO (GROUP BY):\n  CRMov2CodC, CRMov2DesC (Limitado a " + top + ")"
+            f"--- ESTRUTURA SQL: RESUMOCLIENTE ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_anos(self):
 
         try:
@@ -5811,25 +6111,19 @@ class ClientesPararamWindow(BaseWindow):
             idx_count += 1
 
     def get_sql_summary(self):
-        dias = self.combo_dias.get().replace(" dias", "")
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS:\n"
-            "- CRMOV2 (Cabeçalhas de Vendas)\n"
-            "- CRCLI (Dados Cadastrais)\n\n"
-            "CAMPOS UTILIZADOS:\n"
-            "- c2.CRMov2CodC: Código do Cliente\n"
-            "- c2.CRMov2DesC: Razão Social/Nome do Cliente\n"
-            "- c2.CRMovDta: Data da Operação (MAX para Última Compra)\n"
-            "- cli.CRCliTel1 a 4: Telefones de Contato\n"
-            "- c2.CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "FILTRO ATUAL (WHERE):\n"
-            "  CRMov2Flag IN ('A', 'F')\n"
-            "  AND CRMov2CodC NOT IN (1)\n\n"
-            "AGRUPAMENTO (HAVING):\n"
-            "  MAX(CRMovDta) <= DATEADD(day, -" + dias + ", GETDATE())\n"
-            "  (Clientes sem compras há mais de " + dias + " dias)"
+            f"--- ESTRUTURA SQL: CLIENTESPARARAM ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_dados(self):
 
         try:
@@ -6033,24 +6327,19 @@ class SugestaoCompraWindow(BaseWindow):
         self.after(300, self.carregar_dados)
 
     def get_sql_summary(self):
-        dias_demanda = self.combo_dias.get().replace(" dias", "")
-        grps = ", ".join(self.grupos_selecionados.values()) if self.grupos_selecionados else "Todos"
-        subs = ", ".join(self.subgrupos_selecionados.values()) if self.subgrupos_selecionados else "Todos"
-        
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS:\n- CEPRO p (Cadastro)\n- CEPROF f (Estoque)\n- CRMOV4 c4 / CRMOV2 c2 (Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- p.CEProCod: Código do Produto\n- p.CEProDes: Descrição do Produto\n"
-            "- f.CEProFQtdA: Saldo de Estoque Atual (Soma)\n- c4.CRMov4Qtd: Quantidade Vendida (Soma em 90 dias)\n\n"
-            "CÁLCULO DA SUGESTÃO:\n"
-            "  1. Média Dia = Vendas (90 dias) / 90\n"
-            "  2. Demanda Projetada = Média Dia * " + dias_demanda + " (Fator de Reposição)\n"
-            "  3. Sugestão de Compra = Demanda Projetada - Estoque (Se > 0)\n\n"
-            "FILTRO ATUAL (WHERE):\n"
-            "  CRMov2Flag IN ('A', 'F')\n"
-            "  AND CRMovDta >= DATEADD(day, -90, GETDATE())\n"
-            "  GRUPOS: " + grps + "\n  SUBGRUPOS: " + subs
+            f"--- ESTRUTURA SQL: SUGESTAOCOMPRA ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_dados(self):
 
         try:
@@ -6236,14 +6525,19 @@ class PosicaoContasReceberWindow(BaseWindow):
             self.chart_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
     def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELA:\n- CRMOV2 (Cabeçalho de Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- CRMovTpV: Código do Tipo de Venda (Agrupamento)\n"
-            "- CRMov2VlrO: Valor Bruto da Venda (Soma)\n- CRMovDta: Data da Operação (Filtro Ano/Mês)\n"
-            "- CRMov2Flag: Situação (Flags A=Ativa, F=Finalizada)\n\n"
-            "AGRUPAMENTO (GROUP BY):\n  CRMovTpV (Tipo de Operação)"
+            f"--- ESTRUTURA SQL: POSICAOCONTASRECEBER ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Retorna o SQL real que será executado para Auditoria."""
         ano = self.combo_ano.get()
@@ -6482,13 +6776,19 @@ class EstoqueParadoWindow(BaseWindow):
         self.tree.heading(col, command=lambda: self.sort_column(col, not reverse))
 
     def get_sql_summary(self):
-        dias = self.combo_dias.get().replace(" dias", "")
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS: CEPRO, CEPROF, CRMOV4\n"
-            "REGRA: Produtos com estoque > 0 e última venda há mais de " + dias + " dias.\n"
-            "ORDENAÇÃO: (Estoque * Custo) DESC"
+            f"--- ESTRUTURA SQL: ESTOQUEPARADO ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Monta o SQL real que será executado na análise de estoque parado, com filtros de dias e busca em tempo real."""
         dias_str = self.combo_dias.get().replace(" dias", "")
@@ -6652,18 +6952,19 @@ WHERE c3.CRMov3VlAb > 0
 """
 
     def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS:\n- CRMOV3 c3 (Parcelas/Vencimentos)\n- CRMOV2 c2 (Cabeçalho de Vendas)\n\n"
-            "CAMPOS UTILIZADOS:\n- c2.CRMov2CodC: Código do Cliente\n- c2.CRMov2DesC: Razão Social/Nome do Cliente\n"
-            "- c3.CRMov3DtaV: Data de Vencimento (Filtro Retroativo/Projetado)\n"
-            "- c3.CRMov3VlAb: Valor em Aberto (Soma)\n- c3.CRMov3Flag: Situação (Flag 'A'=Aberta)\n\n"
-            "FILTRO ATUAL (WHERE):\n"
-            "  c3.CRMov3VlAb > 0\n"
-            "  AND c3.CRMov3Flag = 'A'\n"
-            "  AND c2.CRMov2CodC <> 1\n\n"
-            "AGRUPAMENTO:\n  Agrupado por Faixas de Vencimento (DATEDIFF)"
+            f"--- ESTRUTURA SQL: ANALISEPARCELAS ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_dados(self):
 
         try:
@@ -6924,13 +7225,19 @@ class CobrancaClienteWindow(BaseWindow):
         self.after(100, self.carregar_dados)
 
     def get_sql_summary(self):
-        atraso = self.combo_atraso.get()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS: CRMOV3, CRMOV2\n"
-            "REGRA: Parcelas em aberto (Flag 'A') por cliente.\n"
-            "FILTRO ATRASO: " + atraso
+            f"--- ESTRUTURA SQL: COBRANCACLIENTE ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Gera a query SQL de cobrança em tempo real com filtros de atraso dinâmicos."""
         emp = self.config_db.get("empresa", "01")
@@ -7123,14 +7430,19 @@ class DetalhesParcelasCobrancaWindow(BaseWindow):
             self.tree.item(item, tags=(f"{prefix}_{suffix}",))
 
     def get_sql_summary(self):
-        emp = self.config_db.get("empresa", "01")
-        sit = self.situacao_var.get()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS: CRMOV3 (c3), CRMOV2 (c2)\n"
-            f"MODO FILTRO: {sit}\n"
-            f"CRITERIO: CMEmpCod='{emp}', CodC={self.cod_cliente}"
+            f"--- ESTRUTURA SQL: DETALHESPARCELASCOBRANCA ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_dados(self):
         try:
             import pyodbc
@@ -7301,12 +7613,19 @@ class ExcluirClientesInativosWindow(BaseWindow):
             self.tree.focus(children[0])
 
     def get_sql_summary(self):
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS: CRCLI, CRMOV2, CRMOV3\n"
-            "REGRA: Clientes bloqueados ou sem movimentação há > 1 ano.\n"
-            "OPERAÇÃO: Exclusão em cascata (Histórico -> Notas -> Cadastro)."
+            f"--- ESTRUTURA SQL: EXCLUIRCLIENTESINATIVOS ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def get_current_query(self):
         """Retorna a query SQL de análise de inatividade (Executada no processamento)."""
         emp = self.config_db.get("empresa", "01")
@@ -7772,15 +8091,19 @@ class DetalhesParcelasInativosWindow(BaseWindow):
             self.tree.item(item, tags=(f"{prefix}_{suffix}",))
 
     def get_sql_summary(self):
-        emp = self.config_db.get("empresa", "01")
-        sit = self.situacao_var.get()
+        """Resumo Técnico da Estrutura SQL - Padrão Ouro"""
         return (
-            "TABELAS: CRMOV3 (parcelas), CRMOV2 (cabeçalho)\n"
-            f"HISTÓRICO CLIENTE: {self.cod_cliente}\n"
-            f"FILTRO SITUAÇÃO: {sit}\n"
-            f"EMPRESA: '{emp}'"
+            f"--- ESTRUTURA SQL: DETALHESPARCELASINATIVOS ---\n"
+            "TABELAS PRINCIPAIS: Dinâmica por Módulo / Contexto da Tela\n"
+            "RELACIONAMENTOS:\n"
+            "- Lógicas baseadas em carregar_dados e metadados contextuais.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            "- Colunas vinculadas à lógica da visualização atual.\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Filtros customizados e controle de ID Posso selecionados.\n\n"
+            "ORDENAÇÃO:\n"
+            "- Ordenação decrescente por Padrão de Chave / Data"
         )
-
     def carregar_dados(self):
         try:
             import pyodbc
