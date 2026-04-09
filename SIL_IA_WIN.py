@@ -220,10 +220,14 @@ class BaseWindow(ctk.CTkFrame):
 
     def mostrar_sql_bruto(self):
         """Exibe o comando SQL Pronto/Executado seguindo o padrão premium visual."""
+        resumo = self.get_sql_summary() if hasattr(self, 'get_sql_summary') else ""
         query = self.get_current_query() if hasattr(self, 'get_current_query') else getattr(self, 'ultima_query_bruta', "")
+        
         if not query:
             messagebox.showinfo("SQL Bruto", "Aguardando carregamento de dados...")
             return
+            
+        conteudo_completo = f"{resumo}\n\n{'='*50}\n\n{query}" if resumo else query
             
         win = ctk.CTkToplevel(self)
         win.title(f"AUDITORIA SQL ({self.id_str})")
@@ -244,7 +248,7 @@ class BaseWindow(ctk.CTkFrame):
         
         t = ctk.CTkTextbox(f, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
         t.pack(fill="both", expand=True, padx=15, pady=15)
-        t.insert("0.0", query)
+        t.insert("0.0", conteudo_completo)
         t.configure(state="disabled")
         
         btn_f = ctk.CTkFrame(win, fg_color="transparent")
@@ -1993,6 +1997,46 @@ class MainHub(ctk.CTk):
                 self.abrir_modulo(instanciador_lmc1)
                 return
 
+            if key == "POCF1" or key == "MOV_POSTO":
+                def instanciador_mov(parent, config):
+                    win = MovimentoPostoWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_mov)
+                return
+
+            if key == "POLMC2":
+                def instanciador_lmc2(parent, config):
+                    win = LMCEstoqueWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_lmc2)
+                return
+
+            if key == "POLMC3":
+                def instanciador_lmc3(parent, config):
+                    win = LMCResumoWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_lmc3)
+                return
+
+            if key == "POCF2":
+                def instanciador_cf2(parent, config):
+                    win = CaixaFrentistaResumoWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_cf2)
+                return
+
+            if key == "POTCV":
+                def instanciador_tcv(parent, config):
+                    win = TotCompraVendaWindow(parent, config)
+                    win.is_posto_table = True
+                    return win
+                self.abrir_modulo(instanciador_tcv)
+                return
+
             # Custom load logic for the generic window
             def instanciador(parent, config):
                 win = TabelaPostoWindow(parent, config, config_tabela)
@@ -3224,6 +3268,111 @@ class FormularioPostoWindow(ctk.CTkToplevel):
             from tkinter import messagebox
             messagebox.showerror("Erro SQL", f"Erro ao gravar dados:\n\n{str(e)}")
 
+class TotCompraVendaWindow(BaseWindow):
+    """Tela especializada para Total Compra/Venda (POTCV) com filtro de período e totais."""
+    def __init__(self, parent, config):
+        super().__init__(parent, "Total Compra/Venda", "TOT_COMPRA_VENDA")
+        self.config_db = config
+
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        # --- FILTROS DE PERÍODO ---
+        flt = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        flt.pack(side="left", padx=20)
+
+        ctk.CTkLabel(flt, text="De:", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 5))
+        self.entry_dt_ini = ctk.CTkEntry(flt, width=100, font=("Arial", 12), placeholder_text="dd/mm/aaaa")
+        self.entry_dt_ini.insert(0, ini_mes)
+        self.entry_dt_ini.pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(flt, text="Até:", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 5))
+        self.entry_dt_fim = ctk.CTkEntry(flt, width=100, font=("Arial", 12), placeholder_text="dd/mm/aaaa")
+        self.entry_dt_fim.insert(0, fim_mes)
+        self.entry_dt_fim.pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(flt, text="🔍 Filtrar", width=100, height=30, fg_color="#1565C0", hover_color="#0D47A1", font=("Arial", 12, "bold"), command=self.carregar_dados).pack(side="left", padx=5)
+
+        # --- GRID ---
+        cols = ["POTCVDta", "POTCVVnd", "POTCVCom"]
+        hdrs = ["📅 Data", "💰 Vendas", "🛒 Compras"]
+        wids = [150, 180, 180]
+        alns = ["center", "e", "e"]
+        self.configurar_grid(columns=cols, headings=hdrs, widths=wids, aligns=alns)
+
+        # --- RODAPÉ DE TOTAIS (Padrão Ouro - row=2) ---
+        totais_frame = ctk.CTkFrame(self, height=35, fg_color="transparent", corner_radius=0)
+        totais_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 0))
+        self.tree_totais = ttk.Treeview(totais_frame, columns=cols, show="", height=1, style="TotaisTCV.Treeview")
+        self.tree_totais.column("#0", width=0, stretch=False)
+        for c, w, a in zip(cols, wids, alns):
+            self.tree_totais.column(c, width=w, minwidth=w, anchor=a)
+        st = ttk.Style()
+        st.configure("TotaisTCV.Treeview", background="#1565C0", foreground="white", font=("Arial", 12, "bold"), rowheight=28)
+        self.tree_totais.pack(fill="x", expand=True)
+
+        self.after(200, self.carregar_dados)
+
+    def get_current_query(self):
+        from datetime import datetime
+        posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+        dt_i = datetime.strptime(self.entry_dt_ini.get().strip(), "%d/%m/%Y").strftime("%Y%m%d")
+        dt_f = datetime.strptime(self.entry_dt_fim.get().strip(), "%d/%m/%Y").strftime("%Y%m%d")
+        sql = (
+            f"SELECT POTCVDta, POTCVVnd, POTCVCom "
+            f"FROM POTCV "
+            f"WHERE POEmpCod = {posto_id} "
+            f"AND POTCVDta BETWEEN '{dt_i}' AND '{dt_f}' "
+            f"ORDER BY POTCVDta DESC"
+        )
+        return sql
+
+    def get_sql_summary(self):
+        return self.get_current_query()
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            dt_i = datetime.strptime(self.entry_dt_ini.get().strip(), "%d/%m/%Y").strftime("%Y%m%d")
+            dt_f = datetime.strptime(self.entry_dt_fim.get().strip(), "%d/%m/%Y").strftime("%Y%m%d")
+
+            sql = "SELECT POTCVDta, POTCVVnd, POTCVCom FROM POTCV WHERE POEmpCod = ? AND POTCVDta BETWEEN ? AND ? ORDER BY POTCVDta DESC"
+            self.ultima_query_bruta = sql.replace("?", f"'{posto_id}'", 1).replace("?", f"'{dt_i}'", 1).replace("?", f"'{dt_f}'", 1)
+            cur.execute(sql, (posto_id, dt_i, dt_f))
+            rows = cur.fetchall()
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+
+            def fmt_moeda(v):
+                return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            total_vnd, total_com = 0.0, 0.0
+            for r in rows:
+                dt_val = r[0].strftime("%d/%m/%Y") if hasattr(r[0], 'strftime') else str(r[0])
+                vnd = float(r[1] or 0)
+                com = float(r[2] or 0)
+                total_vnd += vnd
+                total_com += com
+                self.tree.insert("", "end", values=(dt_val, fmt_moeda(vnd), fmt_moeda(com)))
+
+            # Atualizar tree_totais
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            self.tree_totais.insert("", "end", values=(
+                f"REGISTROS: {len(rows)}", fmt_moeda(total_vnd), fmt_moeda(total_com)))
+
+            self.re_zebrar(); conn.close()
+        except Exception as e:
+            print(f"Erro ao carregar POTCV: {e}")
+            from tkinter import messagebox
+            messagebox.showerror("Erro", f"Erro ao carregar Total Compra/Venda:\n\n{str(e)}")
+
 class TabelaPostoWindow(BaseWindow):
     def __init__(self, parent, config, info):
         super().__init__(parent, info['titulo'], info['id_tela'])
@@ -3240,6 +3389,17 @@ class TabelaPostoWindow(BaseWindow):
             widths=info['widths'],
             aligns=info['aligns']
         )
+        
+        # --- BARRA AZUL DE REGISTROS (Padrão Ouro - row=2) ---
+        # Remove espaço entre grid e barra e tira padding horizontal para ocupar tela inteira
+        self.grid_frame.grid_configure(padx=0, pady=(0, 0))
+        self.bar_regs = ctk.CTkFrame(self, height=30, fg_color="#1565C0", corner_radius=0)
+        self.bar_regs.grid(row=2, column=0, sticky="ew", padx=0, pady=(0, 5))
+        self.lbl_bar_regs = ctk.CTkLabel(self.bar_regs, text="REGISTROS: 0", font=("Arial", 12, "bold"), text_color="white")
+        self.lbl_bar_regs.pack(side="left", padx=10, pady=2)
+        
+        # Ocultar o contador da bottom_bar (substituído pela barra azul)
+        self.lbl_total_regs.pack_forget()
         
         # Bind do Duplo Clique para Alterar
         self.tree.bind("<Double-1>", self.abrir_formulario_alterar)
@@ -3278,7 +3438,23 @@ class TabelaPostoWindow(BaseWindow):
             print(f"DEBUG Erro abrir manutenção {self.table_info.get('tabela')}: {e}")
 
     def get_sql_summary(self):
-        return f"TABELA: {self.table_info['tabela']}\nCAMPOS: {', '.join(self.table_info['colunas'])}\n\nMODO CRUD: Ativo (Insert/Update)"
+        """Retorna o resumo técnico da lógica de negócio desta tela no Padrão Ouro."""
+        titulo = self.table_info.get('titulo', self.table_info.get('tabela', '')).upper()
+        tabela = self.table_info.get('tabela', 'N/A')
+        colunas = ", ".join(self.table_info.get('colunas', []))
+        return (
+            f"--- ESTRUTURA SQL: {titulo} ---\n"
+            f"TABELA PRINCIPAL: {tabela} (Cadastro Dinâmico)\n"
+            "RELACIONAMENTOS:\n"
+            "- Operações diretas na tabela base na maioria dos casos.\n"
+            "- Casos especiais (como Tanques/Bicos) recebem JOINs específicos no método carregar_dados.\n\n"
+            "MÉTRICAS / CAMPOS EXIBIDOS:\n"
+            f"- {colunas}\n\n"
+            "FILTROS APLICADOS:\n"
+            "- Posto/Empresa: (ID Selecionado no Hub globalmente)\n\n"
+            "OPERAÇÕES SUPORTADAS:\n"
+            "- MODO CRUD Ativo: Permite Inclusão (Insert), Edição (Update) e Exclusão."
+        )
 
     def carregar_dados(self):
         try:
@@ -3415,6 +3591,7 @@ class TabelaPostoWindow(BaseWindow):
                 self.tree.insert("", "end", values=tuple(fmt_vals))
             
             self.re_zebrar()
+            self.lbl_bar_regs.configure(text=f"REGISTROS: {len(rows)}")
             conn.close()
         except Exception as e:
             print(f"Erro ao carregar {self.table_info['tabela']}: {e}")
@@ -3792,6 +3969,967 @@ class LMCVendaBombaWindow(BaseWindow):
             from tkinter import messagebox
             messagebox.showerror("Erro SQL", f"Erro ao carregar POLMC1:\n{e}")
             print(f"Erro ao carregar POLMC1 Especializado: {e}")
+
+
+
+class LMCEstoqueWindow(BaseWindow):
+    def __init__(self, parent, config):
+        self.table_info = POSTO_TABLES_CONFIG["POLMC2"]
+        super().__init__(parent, "📈 LMC 2: Estoque/Entrada (Especializado)", "LMC_ESTOQUE")
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent 
+        self.is_posto_table = True
+
+        # --- BARRA DE FILTROS ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", fill="x", expand=True, padx=20, pady=(0, 5))
+
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        ctk.CTkLabel(self.filter_frame, text="📅 De:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(self.filter_frame, width=95, height=32, font=("Arial", 13)); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(self.filter_frame, text="Até:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(5, 2))
+        self.ent_ate = ctk.CTkEntry(self.filter_frame, width=95, height=32, font=("Arial", 13)); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(self.filter_frame, text="🛢️ Tanque:", font=("Arial", 12, "bold"), text_color="#1E293B").pack(side="left", padx=(10, 2))
+        self.combo_tanque = ctk.CTkComboBox(self.filter_frame, values=["✨ Todos"], width=130, font=("Arial", 12))
+        self.combo_tanque.pack(side="left", padx=2)
+        self.combo_tanque.set("✨ Todos")
+
+        self.btn_filtrar = ctk.CTkButton(self.filter_frame, text="⚙️ Filtrar", width=100, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#1E88E5", hover_color="#1565C0", command=self.carregar_dados)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        self.after(500, self.carregar_tanques)
+
+        # Configuração da Grid
+        cols = ("Data", "TnqCod", "TnqDes", "EstIni", "Compras", "Vendas", "Ajustes", "Transf", "EstFin")
+        heads = ("📅 Data", "🛢️ Tanq", "📝 Descrição", "📦 Est. Inicial", "🔋 Compras", "⛽ Vendas", "⚙️ Ajustes", "🔄 Transf.", "🏁 Est. Final")
+        wids = (100, 60, 180, 100, 100, 100, 100, 100, 100)
+        alns = ("center", "center", "w", "e", "e", "e", "e", "e", "e")
+        self.configurar_grid(cols, heads, wids, alns)
+        
+        self.after(200, self.carregar_dados)
+
+    def carregar_tanques(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor()
+                posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+                cur.execute("SELECT POTnqCod, POTnqDes FROM POTnq WHERE POEmpCod = ? ORDER BY POTnqCod", (posto_id,))
+                rows = cur.fetchall()
+                if not rows:
+                    print(f"DEBUG: Nenhum tanque encontrado para posto {posto_id}")
+                vals = ["✨ Todos"] + [f"{r[0]} - {r[1]}" for r in rows]
+                self.combo_tanque.configure(values=vals)
+                self.combo_tanque.set("✨ Todos")
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showwarning("Aviso", f"Não foi possível carregar a lista de tanques:\n{e}")
+            print(f"Erro tanques: {e}")
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            de_raw = self.ent_de.get().strip()
+            ate_raw = self.ent_ate.get().strip()
+            
+            de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+
+            filtro_tanque = ""
+            params = [posto_id, de, ate]
+            sel_tanque = self.combo_tanque.get()
+            if sel_tanque != "✨ Todos":
+                tnq_id = sel_tanque.split(" - ")[0]
+                filtro_tanque = " AND l.POTnqCod = ? "
+                params.append(tnq_id)
+
+            sql = f"""
+                SELECT 
+                    l.PODtaMov,
+                    l.POTnqCod,
+                    MAX(t.POTnqDes) as TnqDes,
+                    MAX(l.POLMC2EIn) as EstIni,
+                    COALESCE((SELECT SUM(e.POENFQtd) FROM POENF e WHERE e.POEmpCod = l.POEmpCod AND e.PODtaMov = l.PODtaMov AND e.POTnqCod = l.POTnqCod), 0) as Compras,
+                    COALESCE((SELECT SUM(l1.POLMC1Qtd) FROM POLMC1 l1 JOIN POBom b ON l1.POBomCod = b.POBomCod AND l1.POEmpCod = b.POEmpCod 
+                              WHERE l1.POEmpCod = l.POEmpCod AND l1.PODtaMov = l.PODtaMov AND b.POBomTnqCo = l.POTnqCod), 0) as Vendas,
+                    MAX(l.POLMC2E_S) as Ajustes,
+                    MAX(l.POLMC2TrsQ) as Transf,
+                    (MAX(l.POLMC2EIn) + 
+                     COALESCE((SELECT SUM(e.POENFQtd) FROM POENF e WHERE e.POEmpCod = l.POEmpCod AND e.PODtaMov = l.PODtaMov AND e.POTnqCod = l.POTnqCod), 0) - 
+                     COALESCE((SELECT SUM(l1.POLMC1Qtd) FROM POLMC1 l1 JOIN POBom b ON l1.POBomCod = b.POBomCod AND l1.POEmpCod = b.POEmpCod 
+                               WHERE l1.POEmpCod = l.POEmpCod AND l1.PODtaMov = l.PODtaMov AND b.POBomTnqCo = l.POTnqCod), 0) + 
+                     MAX(l.POLMC2E_S) + MAX(l.POLMC2TrsQ)) as EstFin
+                FROM POLMC2 l
+                LEFT JOIN POTnq t ON l.POTnqCod = t.POTnqCod AND l.POEmpCod = t.POEmpCod
+                WHERE l.POEmpCod = ?
+                  AND CAST(l.PODtaMov AS DATE) BETWEEN ? AND ?
+                  {filtro_tanque}
+                GROUP BY l.POEmpCod, l.PODtaMov, l.POTnqCod
+                ORDER BY l.PODtaMov DESC, l.POTnqCod ASC
+            """
+            
+            self.ultima_query_bruta = sql.replace("?", f"'{posto_id}'", 1).replace("?", f"'{de}'", 1).replace("?", f"'{ate}'", 1)
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            
+            totais = [0.0] * 6 # EstIni, Compras, Vendas, Ajustes, Transf, EstFin
+            primeiro_lanca_tanque = {} # tnq_cod -> (data, val_ini)
+            ultimo_lanca_tanque = {}   # tnq_cod -> (data, val_fin)
+            
+            for r in rows:
+                dt_mov = r[0]
+                tnq_cod = str(r[1])
+                vals = [dt_mov.strftime("%d/%m/%Y") if hasattr(dt_mov, 'strftime') else str(dt_mov), tnq_cod, str(r[2] or "N/A")]
+                
+                v_ini = float(r[3] or 0)
+                v_fin = float(r[8] or 0)
+
+                # Estoque Inicial (Data mais antiga do período para este tanque)
+                if tnq_cod not in primeiro_lanca_tanque or dt_mov < primeiro_lanca_tanque[tnq_cod][0]:
+                    primeiro_lanca_tanque[tnq_cod] = (dt_mov, v_ini)
+                
+                # Estoque Final (Data mais recente do período para este tanque)
+                if tnq_cod not in ultimo_lanca_tanque or dt_mov > ultimo_lanca_tanque[tnq_cod][0]:
+                    ultimo_lanca_tanque[tnq_cod] = (dt_mov, v_fin)
+
+                for i in range(3, 9):
+                    val = float(r[i] or 0)
+                    if i in (4, 5, 6, 7): # Apenas Compras, Vendas, Ajustes e Transf são somados acumulados
+                        totais[i-3] += val
+                    vals.append(f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                self.tree.insert("", "end", values=tuple(vals))
+
+            # Rodapé (Lógica especializada para Estoques Inicial e Final)
+            total_real_est_ini = sum(item[1] for item in primeiro_lanca_tanque.values())
+            total_real_est_fin = sum(item[1] for item in ultimo_lanca_tanque.values())
+            
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            row_tot = [""] * 9
+            row_tot[0] = f"SOMA:"
+            # i=3: Est. Inicial
+            row_tot[3] = f"{total_real_est_ini:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            # i=4..7: Compras, Vendas, Ajustes, Transf
+            for i in range(4, 8):
+                row_tot[i] = f"{totais[i-3]:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+            # i=8: Est. Final (Último lançamento somado)
+            row_tot[8] = f"{total_real_est_fin:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+            self.tree_totais.insert("", "end", values=tuple(row_tot))
+
+            self.re_zebrar()
+            conn.close()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", f"Erro ao carregar POLMC2:\n{e}")
+            print(f"Erro ao carregar POLMC2 Especializado: {e}")
+
+
+class LMCResumoWindow(BaseWindow):
+    def __init__(self, parent, config):
+        self.table_info = POSTO_TABLES_CONFIG["POLMC3"]
+        super().__init__(parent, "📊 LMC 3: Resumo Período (Especializado)", "LMC_RESUMO")
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent 
+        self.is_posto_table = True
+
+        # --- BARRA DE FILTROS (Alinhada à Esquerda) ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
+
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        ctk.CTkLabel(self.filter_frame, text="📅 Período:", font=("Arial", 12, "bold")).pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(self.filter_frame, width=90, height=32, font=("Arial", 12))
+        self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=2)
+
+        ctk.CTkLabel(self.filter_frame, text="até", font=("Arial", 12)).pack(side="left", padx=5)
+        self.ent_ate = ctk.CTkEntry(self.filter_frame, width=90, height=32, font=("Arial", 12))
+        self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(self.filter_frame, text="⛽ Prod:", font=("Arial", 12, "bold")).pack(side="left", padx=(10, 2))
+        self.combo_produto = ctk.CTkComboBox(self.filter_frame, values=["✨ Todos"], width=160, font=("Arial", 12))
+        self.combo_produto.pack(side="left", padx=2)
+        self.combo_produto.set("✨ Todos")
+
+        self.btn_filtrar = ctk.CTkButton(self.filter_frame, text="⚙️ Filtrar", width=100, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#1E88E5", hover_color="#1565C0", command=self.carregar_dados)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        # Configuração da Grid (POLMC3)
+        cols = ("Data", "CombCod", "CombDes", "EstIni", "Entradas", "Vendas", "Ajustes", "EstFin")
+        heads = ("📅 Data", "🔢 Cód.", "⛽ Combustível", "📦 Est. Inicial", "📥 Entradas", "📤 Vendas", "⚙️ Ajustes", "🏁 Est. Final")
+        wids = (110, 60, 200, 110, 110, 110, 110, 110)
+        alns = ("center", "center", "w", "e", "e", "e", "e", "e")
+        self.configurar_grid(cols, heads, wids, alns)
+        
+        self.after(500, self.carregar_produtos)
+        self.after(800, self.carregar_dados)
+
+    def carregar_produtos(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            with pyodbc.connect(conn_str) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT POTCoCod, POTCoDes FROM POTCo ORDER BY POTCoCod")
+                rows = cur.fetchall()
+                vals = ["✨ Todos"] + [f"{int(r[0])} - {str(r[1]).strip().upper()}" for r in rows]
+                self.combo_produto.configure(values=vals)
+        except Exception as e:
+            print(f"Erro ao carregar combustíveis no resumo: {e}")
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+            de = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+
+            filtro_prod = ""
+            params = [posto_id, de, ate]
+            sel_prod = self.combo_produto.get()
+            if sel_prod != "✨ Todos":
+                prod_cod = sel_prod.split(" - ")[0]
+                filtro_prod = " AND l.POLMC3TCoC = ? "
+                params.append(prod_cod)
+
+            sql = f"""
+                SELECT 
+                    l.PODtaMov,
+                    l.POLMC3TCoC,
+                    MAX(c.POTCoDes) as CombDes,
+                    SUM(l.POLMC3Ein) as EstIni,
+                    SUM(l.POLMC3EntN) as Entradas,
+                    SUM(l.POLMC3Vda) as Vendas,
+                    SUM(l.POLMC3E_S) as Ajustes,
+                    (SUM(l.POLMC3Ein) + SUM(l.POLMC3EntN) - SUM(l.POLMC3Vda) + SUM(l.POLMC3E_S)) as EstFin
+                FROM POLMC3 l
+                LEFT JOIN POTCo c ON l.POLMC3TCoC = c.POTCoCod
+                WHERE l.POEmpCod = ?
+                  AND CAST(l.PODtaMov AS DATE) BETWEEN ? AND ?
+                  {filtro_prod}
+                GROUP BY l.PODtaMov, l.POLMC3TCoC
+                ORDER BY l.PODtaMov DESC, l.POLMC3TCoC ASC
+            """
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            
+            totais_mov = [0.0] * 3 # Ent, Vnd, Aju
+            pri_est = {} # cat -> (data, val)
+            ult_est = {} # cat -> (data, val)
+            
+            for r in rows:
+                dt = r[0]; cat = str(r[1])
+                v_ini = float(r[3] or 0); v_ent = float(r[4] or 0)
+                v_vnd = float(r[5] or 0); v_aju = float(r[6] or 0)
+                v_fin = float(r[7] or 0)
+
+                if cat not in pri_est or dt < pri_est[cat][0]: pri_est[cat] = (dt, v_ini)
+                if cat not in ult_est or dt > ult_est[cat][0]: ult_est[cat] = (dt, v_fin)
+                
+                totais_mov[0] += v_ent; totais_mov[1] += v_vnd; totais_mov[2] += v_aju
+
+                vals = [dt.strftime("%d/%m/%Y") if hasattr(dt, 'strftime') else str(dt), cat, str(r[2] or "N/A")]
+                for val in [v_ini, v_ent, v_vnd, v_aju, v_fin]:
+                    vals.append(f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                self.tree.insert("", "end", values=tuple(vals))
+
+            # Rodapé Inteligente
+            t_ini = sum(v[1] for v in pri_est.values())
+            t_fin = sum(v[1] for v in ult_est.values())
+            
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            row_tot = [""] * 8
+            row_tot[0] = "SOMA:"
+            row_tot[3] = f"{t_ini:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            row_tot[4] = f"{totais_mov[0]:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            row_tot[5] = f"{totais_mov[1]:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            row_tot[6] = f"{totais_mov[2]:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            row_tot[7] = f"{t_fin:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+            self.tree_totais.insert("", "end", values=tuple(row_tot))
+            self.re_zebrar(); conn.close()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", f"Erro ao carregar POLMC3:\n{e}")
+            print(f"Erro ao carregar POLMC3 Especializado: {e}")
+
+
+class MovimentoPostoWindow(BaseWindow):
+    def __init__(self, parent, config):
+        super().__init__(parent, "⭐ Movimentos do Posto (Auditoria Completa)", "MOV_POSTO")
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent 
+        self.is_posto_table = True
+
+        # --- BARRA DE FILTROS ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
+
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        ctk.CTkLabel(self.filter_frame, text="📅 Período:", font=("Arial", 12, "bold")).pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(self.filter_frame, width=90, height=32); self.ent_de.pack(side="left", padx=2)
+        self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=2)
+
+        ctk.CTkLabel(self.filter_frame, text="até", font=("Arial", 12)).pack(side="left", padx=5)
+        self.ent_ate = ctk.CTkEntry(self.filter_frame, width=90, height=32); self.ent_ate.pack(side="left", padx=2)
+        self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+
+        self.btn_filtrar = ctk.CTkButton(self.filter_frame, text="⚙️ Filtrar", width=100, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#1E88E5", hover_color="#1565C0", command=self.carregar_dados)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        ctk.CTkLabel(self.filter_frame, text="👤 Frentista:", font=("Arial", 12, "bold")).pack(side="left", padx=(10, 2))
+        self.combo_frentista = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=130, height=32)
+        self.combo_frentista.pack(side="left", padx=2)
+        self.combo_frentista.set("Todos")
+
+        # --- GRID CONFIG (45 COLUNAS - Auditoria Total) ---
+        cols = (
+            "Tst", "Regis", "VlrCx", "Usu", "VlrMo", "VlrDs", "VlrAc", "VlrSa", "TipMo", "DesTi", "Sts", 
+            "TstFe", "Obs", "Bic", "BomCo", "ProCo", "ProDe", "Qtd", "VelIn", "VelFi", "VlrUn", 
+            "VlrBo", "TstCo", "Can", "DataA", "HoraA", "PUBom", "VlrLu", "DCx", "VUF", "CusUn", "CusTo", "VTF", "VDFFa",
+            "Mrg", "VlrCC", "TipCC", "CarCn", "PECDs", "VDF", "NroNf", "LibGe", "Canal", "TipOr"
+        )
+        heads = (
+            "🕒 Lançamento", "🔢 Regis.", "💰 Vlr Cx", "👤 Frentista", "📈 Movim.", "📉 Desc.", "➕ Acrésc.", "⚖️ Saldo", "📂 Tipo", "📝 Desc. Tipo", "🔘 Sts", 
+            "🕒 Fech.", "📝 Obs.", "📦 Bico", "⛽ Bomba", "🏷️ Cód. Pro.", "📦 Produto", "📊 Qtd.", "🏁 Vel. Ini.", "🏁 Vel. Fim.", "💰 Unit.", 
+            "⛽ Vlr Bomba", "🕒 Confir.", "🚫 Can.", "📅 Data Ab.", "🕒 Hora Ab.", "⛽ P. Bomba", "📈 Lucro", "🕒 Data Cx", "💎 Unit. Fis.", "💰 Custo Un.", "💰 Custo Tot.", "💎 Tot. Fis.", "📉 Desc. Fis. Fake",
+            "📊 Margem", "💳 Vlr Adic. CC", "💳 Tipo CC", "🛒 Car. Conv.", "📉 PEC Desc.", "📉 Desc. Fis.", "📄 NF", "🔑 Lib. Ger.", "📡 Canal", "📂 Tip. Orig."
+        )
+        wids = (140, 80, 100, 100, 100, 90, 90, 100, 60, 120, 50, 140, 150, 60, 60, 90, 180, 80, 100, 100, 90, 100, 140, 50, 90, 80, 90, 90, 140, 90, 90, 100, 100, 110, 80, 100, 80, 80, 90, 90, 80, 70, 60, 60)
+        alns = ("center", "center", "e", "w", "e", "e", "e", "e", "center", "w", "center", "center", "w", "center", "center", "center", "w", "e", "e", "e", "e", "e", "center", "center", "center", "center", "e", "e", "center", "e", "e", "e", "e", "e", "e", "e", "center", "center", "e", "e", "center", "center", "center", "center")
+        
+        self.configurar_grid(cols, heads, wids, alns)
+
+        # Adicionar Scrollbar Horizontal (Necessário para 33 colunas)
+        self.h_scroll = ttk.Scrollbar(self.grid_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(xscrollcommand=self.h_scroll.set)
+        self.h_scroll.pack(side="bottom", fill="x")
+
+        self.after(200, self.carregar_dados)
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            from datetime import datetime
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            de_dt = datetime.strptime(self.ent_de.get(), "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate_dt = datetime.strptime(self.ent_ate.get(), "%d/%m/%Y").strftime("%Y-%m-%d")
+
+            frentista_sel = self.combo_frentista.get()
+            where_ext = " AND POCF1Usu = ? " if frentista_sel != "Todos" else ""
+            params = [posto_id, de_dt, ate_dt]
+            if frentista_sel != "Todos": params.append(frentista_sel)
+
+            sql = f"""
+                SELECT 
+                    POCF1Tst, POCF1Regis, POCF1VlrCx, POCF1Usu, POCF1VlrMo, POCF1VlrDs, POCF1VlrAc, POCF1VlrSa, 
+                    POCF1TipMo, 
+                    CASE POCF1TipMo 
+                        WHEN 'V' THEN 'VENDA' WHEN 'R' THEN 'RECEBIMENTO' WHEN 'S' THEN 'SAIDA' WHEN 'E' THEN 'ENTRADA' 
+                        ELSE POCF1TipMo END as DesTi,
+                    POCF1Sts, POCF1TstFe, POCF1Obs, POCF1Bic, POCF1BomCo, POCF1ProCo, POCF1ProDe, 
+                    POCF1Qtd, POCF1VelIn, POCF1VelFi, POCF1VlrUn, POCF1VlrBo, POCF1TstCo, POCF1Can, POCF1DataA, 
+                    POCF1HoraA, POCF1PUBom, POCF1VlrLu, POCF1DCx, POCF1VUF, 
+                    POCF1CusUn,
+                    (POCF1Qtd * ISNULL(POCF1CusUn, 0)) as CusTo, 
+                    (POCF1VUF * POCF1Qtd) as VTF,
+                    CASE 
+                        WHEN POCF1VlrCx > (POCF1VUF * POCF1Qtd) AND (POCF1VUF * POCF1Qtd) <> 0 
+                        THEN POCF1VlrCx - (POCF1VUF * POCF1Qtd) 
+                        ELSE 0 END as VDFFa,
+                    POCF1Mrg, POCF1VlrCC, POCF1TipCC, POCF1CarCn, POCF1PECDs, POCF1VDF, 
+                    POCF1NroNf, POCF1LibGe, POCF1Canal, POCF1TipOr
+                FROM POCF1
+                WHERE POEmpCod = ? AND CAST(POCF1Tst AS DATE) BETWEEN ? AND ?
+                {where_ext}
+                ORDER BY POCF1Tst DESC
+            """
+            self.ultima_query_bruta = sql
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+
+            # Atualizar Combobox
+            if frentista_sel == "Todos":
+                frentistas = sorted(list(set(str(r[3]).strip() for r in rows if r[3])))
+                self.combo_frentista.configure(values=["Todos"] + frentistas)
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            fmt_moeda = lambda v: f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            fmt_4 = lambda v: f"{v:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            
+            for r in rows:
+                v = list(r)
+                # Datas: 0(Tst), 11(TstFe), 22(TstCo), 24(DataA), 28(DCx)
+                for idx in [0, 11, 22, 28]:
+                    if v[idx] and hasattr(v[idx], "strftime"): v[idx] = v[idx].strftime("%d/%m/%Y %H:%M")
+                    else: v[idx] = "" if not v[idx] else v[idx]
+                if v[24] and hasattr(v[24], "strftime"): v[24] = v[24].strftime("%d/%m/%Y")
+
+                # Numéricos: VlrCx(2), VlrMo(4), VlrDs(5), VlrAc(6), VlrSa(7), Qtd(17), Vel(18,19), Un(20), VlrBo(21), PUB(26), Luc(27), VUF(29), CusUn(30), CusTo(31), VTF(32), VDFFa(33), Mrg(34), VlrCC(35), PECDs(38), VDF(39)
+                for idx in [2, 4, 5, 6, 7, 17, 18, 19, 20, 21, 26, 27, 29, 30, 31, 32, 33, 34, 35, 38, 39]:
+                    if v[idx] is not None: 
+                        if idx in [29, 30, 38]: v[idx] = fmt_4(float(v[idx]))
+                        else: v[idx] = fmt_moeda(float(v[idx]))
+                
+                self.tree.insert("", "end", values=tuple(v))
+
+            # Totais no rodapé (Quantidade, Valor Movimento e Valor Caixa)
+            total_qtd = sum(float(r[17] or 0) for r in rows)
+            total_mov = sum(float(r[4] or 0) for r in rows)
+            total_cx = sum(float(r[2] or 0) for r in rows)
+            
+            info_tot = f"Total: {len(rows)} | 📊 Qtd: {total_qtd:,.3f} | 📈 Movim: {fmt_moeda(total_mov)} | 💰 Caixa: {fmt_moeda(total_cx)}"
+            self.lbl_total_regs.configure(text=info_tot)
+            self.re_zebrar(); conn.close()
+        except Exception as e:
+            print(f"Erro POCF1: {e}")
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", str(e))
+
+class CaixaFrentistaResumoWindow(BaseWindow):
+    def __init__(self, parent, config, initial_filters=None):
+        self.table_info = POSTO_TABLES_CONFIG["POCF2"]
+        super().__init__(parent, "👥 Caixa Frentista: Resumo (Especializado)", "CX_FRENTISTA_RES")
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent 
+        self.is_posto_table = True
+        self.initial_filters = initial_filters
+
+        # --- BARRA DE FILTROS ---
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=(0, 5), anchor="w")
+
+        from datetime import date
+        hoje = date.today()
+        ini_mes = date(hoje.year, hoje.month, 1).strftime("%d/%m/%Y")
+        fim_mes = hoje.strftime("%d/%m/%Y")
+
+        ctk.CTkLabel(self.filter_frame, text="📅 Período:", font=("Arial", 12, "bold")).pack(side="left", padx=2)
+        self.ent_de = ctk.CTkEntry(self.filter_frame, width=90, height=32, font=("Arial", 12))
+        self.ent_de.pack(side="left", padx=2)
+        if self.initial_filters:
+            self.ent_de.insert(0, self.initial_filters.get('de', ini_mes))
+        else:
+            self.ent_de.insert(0, ini_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_de)).pack(side="left", padx=2)
+
+        ctk.CTkLabel(self.filter_frame, text="até", font=("Arial", 12)).pack(side="left", padx=5)
+        self.ent_ate = ctk.CTkEntry(self.filter_frame, width=90, height=32, font=("Arial", 12))
+        self.ent_ate.pack(side="left", padx=2)
+        if self.initial_filters:
+            self.ent_ate.insert(0, self.initial_filters.get('ate', fim_mes))
+        else:
+            self.ent_ate.insert(0, fim_mes)
+        ctk.CTkButton(self.filter_frame, text="📅", width=25, height=32, fg_color="transparent", text_color="black", hover_color="#E0E0E0", 
+                     command=lambda: self.abrir_calendario(self.ent_ate)).pack(side="left", padx=(0, 10))
+
+        self.btn_filtrar = ctk.CTkButton(self.filter_frame, text="⚙️ Filtrar", width=100, height=32, font=("Arial", 12, "bold"), 
+                                        fg_color="#1E88E5", hover_color="#1565C0", command=self.carregar_dados)
+        self.btn_filtrar.pack(side="left", padx=10)
+
+        ctk.CTkLabel(self.filter_frame, text="👤 Frentista:", font=("Arial", 12, "bold")).pack(side="left", padx=(10, 2))
+        self.combo_frentista = ctk.CTkComboBox(self.filter_frame, values=["Todos"], width=130, height=32, font=("Arial", 12), command=lambda _: self.carregar_dados())
+        self.combo_frentista.pack(side="left", padx=2)
+        
+        if self.initial_filters and self.initial_filters.get('frentista'):
+            self.combo_frentista.set(self.initial_filters['frentista'])
+        else:
+            self.combo_frentista.set("Todos")
+
+        # Configuração da Grid (POCF2 - Simplificada p/ auditoria)
+        cols = ("Usu", "Abertura", "VlrFi", "TSTFe", "UsuFe", "VlrBo", "CofVl", "VlrDe", "VlrRe", "RecCa", "LucCo", "DCx")
+        heads = ("👤 Frentista", "🕒 Abertura", "🏁 Valor Final", "🕒 Fech.", "👤 Conf.", "⛽ Bombas", "📥 Cofre", "📉 Desc.", "💰 Rec.", "💳 Cartão", "📈 Lucro", "📅 Data Cx")
+        wids = (120, 150, 110, 150, 100, 110, 110, 90, 110, 110, 90, 100)
+        alns = ("w", "center", "e", "center", "w", "e", "e", "e", "e", "e", "e", "center")
+        self.configurar_grid(cols, heads, wids, alns)
+        
+        self.after(200, self.carregar_dados)
+        self.tree.bind("<Button-1>", self.on_double_click)
+        self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<Return>", self.on_double_click)
+
+    def on_double_click(self, event):
+        """Captura o clique (simples ou duplo) e abre a tela de detalhes (POCF1)."""
+        # Padrão Ouro: Identificar exatamente se clicou em uma linha
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            # Fallback para seleção atual se for via teclado (Enter) ou clique manual
+            selection = self.tree.selection()
+            if not selection: return
+            item_id = selection[0]
+        
+        if not item_id or "|" not in str(item_id): return
+
+        try:
+            usu_raw, tst_raw = str(item_id).split("|")
+            
+            # Salvar filtros atuais para o retorno
+            filtros_salvos = {
+                'de': self.ent_de.get(),
+                'ate': self.ent_ate.get(),
+                'frentista': self.combo_frentista.get()
+            }
+            
+            # Navegação premium: Substituímos o frame atual
+            self.pack_forget()
+            detalhe = CaixaFrentistaItensWindow(self.hub.main_frame, self.config_db, usu_raw, tst_raw, filtros_salvos)
+            detalhe.hub = self.hub
+            detalhe.pack(fill="both", expand=True)
+            self.hub.modulo_atual = detalhe
+            self.destroy()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro de Navegação", f"Não foi possível abrir o detalhamento:\n{e}")
+            print(f"Erro ao abrir detalhes: {e}")
+
+    def get_sql_summary(self):
+        """Retorna o resumo técnico da lógica de negócio desta tela."""
+        frentista = self.combo_frentista.get()
+        return (
+            "--- ESTRUTURA SQL: RESUMO CAIXA FRENTISTA ---\n"
+            "TABELA PRINCIPAL: POCF2 (Resumo do Caixa)\n"
+            "RELACIONAMENTOS:\n"
+            "- POCF3 (Totais do Caixa): Subquery para somar VlrFi (Valor Final).\n\n"
+            "MÉTRICAS:\n"
+            "- VALOR FINAL (VlrFi): Somatório de POCF3VlrFi vinculado ao Usuário e Timestamp.\n"
+            "- DIFERENÇA (VlrDi): Diferença entre o Valor Manual (VlrMa) e o calculado na POCF3.\n\n"
+            "FILTROS APLICADOS:\n"
+            f"- Posto: (ID Selecionado no Hub)\n"
+            f"- Período: {self.ent_de.get()} até {self.ent_ate.get()}\n"
+            f"- Frentista: {frentista if frentista != 'Todos' else 'Todos os Frentistas'}\n\n"
+            "ORDENAÇÃO:\n"
+            "- POCF2Tst DESC (Lançamentos mais recentes primeiro)"
+        )
+
+    def get_current_query(self):
+        """Gera o comando SQL técnico com base nos filtros atuais da UI."""
+        try:
+            from datetime import datetime
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            de_raw = self.ent_de.get().strip(); ate_raw = self.ent_ate.get().strip()
+            
+            # Tenta converter datas para o formato SQL, mas não trava se falhar (ex: string vazia)
+            try:
+                de_dt = datetime.strptime(de_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+                ate_dt = datetime.strptime(ate_raw, "%d/%m/%Y").strftime("%Y-%m-%d")
+            except:
+                de_dt = "YYYY-MM-DD"; ate_dt = "YYYY-MM-DD"
+
+            frentista_sel = self.combo_frentista.get()
+            where_frentista = f" AND p.POCF2Usu = '{frentista_sel}' " if frentista_sel != "Todos" else ""
+
+            sql = f"""SELECT 
+    p.POCF2Usu, p.POCF2Tst, p.POCF2Sts, p.POCF2VlrMa, 
+    (SELECT SUM(f.POCF3VlrFi) FROM POCF3 f 
+     WHERE f.POEmpCod = p.POEmpCod AND f.POCF2Usu = p.POCF2Usu AND f.POCF2Tst = p.POCF2Tst) as VlrFi,
+    (p.POCF2VlrMa - ISNULL((SELECT SUM(f.POCF3VlrFi) FROM POCF3 f 
+                            WHERE f.POEmpCod = p.POEmpCod AND f.POCF2Usu = p.POCF2Usu AND f.POCF2Tst = p.POCF2Tst), 0)) as VlrDi,
+    p.POCF2TSTFe, p.POCF2UsuFe, p.POCF2VlrBo, p.POCF2CofVl, p.POCF2VlrDe, p.POCF2VlrRe, p.POCF2RecCa, p.POCF2LucCo,
+    p.POCF2VlrCh, p.POCF2VlrMo, p.POCF2DCx
+FROM POCF2 p
+WHERE p.POEmpCod = {posto_id}
+  AND CAST(p.POCF2Tst AS DATE) BETWEEN '{de_dt}' AND '{ate_dt}'
+  {where_frentista}
+ORDER BY p.POCF2Tst DESC"""
+            return sql
+        except Exception as e:
+            return f"-- Erro ao gerar SQL dinâmico: {e}"
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            
+            frentista_sel = self.combo_frentista.get()
+            sql = self.get_current_query()
+            # Ajustar sql para usar placeholders (parametragem real para execução)
+            sql_exec = sql.replace(f"'{frentista_sel}'", "?") if frentista_sel != "Todos" else sql
+            sql_exec = sql_exec.replace("'YYYY-MM-DD'", "?") # Fallback safety
+            
+            # Reprocessar parâmetros reais para o cursor
+            from datetime import datetime
+            posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+            de_dt = datetime.strptime(self.ent_de.get(), "%d/%m/%Y").strftime("%Y-%m-%d")
+            ate_dt = datetime.strptime(self.ent_ate.get(), "%d/%m/%Y").strftime("%Y-%m-%d")
+            
+            params = [posto_id, de_dt, ate_dt]
+            if frentista_sel != "Todos": params.append(frentista_sel)
+
+            # Re-montar a query limpa com placeholders para o pyodbc
+            where_frentista = " AND p.POCF2Usu = ? " if frentista_sel != "Todos" else ""
+            sql_final = f"""
+                SELECT 
+                    p.POCF2Usu, p.POCF2Tst, p.POCF2Sts, p.POCF2VlrMa, 
+                    (SELECT SUM(f.POCF3VlrFi) FROM POCF3 f 
+                     WHERE f.POEmpCod = p.POEmpCod AND f.POCF2Usu = p.POCF2Usu AND f.POCF2Tst = p.POCF2Tst) as VlrFi,
+                    (p.POCF2VlrMa - ISNULL((SELECT SUM(f.POCF3VlrFi) FROM POCF3 f 
+                                            WHERE f.POEmpCod = p.POEmpCod AND f.POCF2Usu = p.POCF2Usu AND f.POCF2Tst = p.POCF2Tst), 0)) as VlrDi,
+                    p.POCF2TSTFe, p.POCF2UsuFe, p.POCF2VlrBo, p.POCF2CofVl, p.POCF2VlrDe, p.POCF2VlrRe, p.POCF2RecCa, p.POCF2LucCo,
+                    p.POCF2VlrCh, p.POCF2VlrMo, p.POCF2DCx
+                FROM POCF2 p
+                WHERE p.POEmpCod = ?
+                  AND CAST(p.POCF2Tst AS DATE) BETWEEN ? AND ?
+                  {where_frentista}
+                ORDER BY p.POCF2Tst DESC
+            """
+            
+            self.ultima_query_bruta = sql # Para Auditoria fiel ao que o usuário vê (com valores)
+            cur.execute(sql_final, tuple(params))
+            rows = cur.fetchall()
+
+            # Atualizar Combobox de Frentistas se estiver em 'Todos'
+            if frentista_sel == "Todos":
+                frentistas_encontrados = sorted(list(set(str(r[0]).strip() for r in rows)))
+                self.combo_frentista.configure(values=["Todos"] + frentistas_encontrados)
+            
+            # Se voltamos de uma tela com filtro, tentar selecionar o frentista original
+            if self.initial_filters and self.initial_filters.get('frentista'):
+                self.combo_frentista.set(self.initial_filters['frentista'])
+                # Limpamos para não forçar em recargas manuais
+                self.initial_filters['frentista'] = None
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            total_calculado = 0.0
+            
+            for r in rows:
+                usu = str(r[0]).strip()
+                tst_ab = r[1]
+                v_fi = float(r[4] or 0)
+                tst_fe = r[6]; usu_fe = str(r[7] or "").strip()
+                v_bo = float(r[8] or 0); v_cof = float(r[9] or 0); v_dec = float(r[10] or 0)
+                v_rec = float(r[11] or 0); v_crt = float(r[12] or 0); v_luc = float(r[13] or 0)
+                dcx = r[16]
+                
+                total_calculado += v_fi
+                
+                ab_fmt = tst_ab.strftime("%d/%m/%Y %H:%M") if hasattr(tst_ab, "strftime") and tst_ab.year < 9999 else "N/A"
+                fe_fmt = tst_fe.strftime("%d/%m/%Y %H:%M") if hasattr(tst_fe, "strftime") and tst_fe.year < 9999 else "ABER"
+                dcx_fmt = dcx.strftime("%d/%m/%Y") if hasattr(dcx, "strftime") and dcx.year < 9999 else "-"
+                
+                # Formatar Numericos (Apenas colunas visiveis)
+                vals = [usu, ab_fmt]
+                vals.append(f"{v_fi:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                vals.append(fe_fmt)
+                vals.append(usu_fe)
+                for v in [v_bo, v_cof, v_dec, v_rec, v_crt, v_luc]:
+                    vals.append(f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                vals.append(dcx_fmt)
+
+                # Usamos IID para guardar as chaves de busca (Frentista | Timestamp)
+                iid_key = f"{usu}|{tst_ab.strftime('%Y-%m-%d %H:%M:%S.%f') if hasattr(tst_ab, 'strftime') else str(tst_ab)}"
+                self.tree.insert("", "end", iid=iid_key, values=tuple(vals))
+
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            row_tot = [""] * 12
+            row_tot[0] = f"REGISTROS: {len(rows)}"
+            row_tot[2] = f"{total_calculado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            self.tree_totais.insert("", "end", values=tuple(row_tot))
+            
+            self.re_zebrar(); conn.close()
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Erro SQL", f"Erro ao carregar POCF2:\n{e}")
+            print(f"Erro ao carregar POCF2 Especializado: {e}")
+
+    def mostrar_sql_bruto(self):
+        """Sobrescreve a auditoria global para aplicar o padrão VIP 2025 nesta tela específica."""
+        resumo = self.get_sql_summary()
+        query = self.get_current_query()
+        
+        win = ctk.CTkToplevel(self)
+        win.title(f"AUDITORIA SQL ({self.id_str})")
+        win.geometry("800x600")
+        win.configure(fg_color="#F1F5F9")
+        win.transient(self); win.grab_set()
+        
+        # Centralizar 800x600
+        sw = win.winfo_screenwidth(); sh = win.winfo_screenheight()
+        win.geometry(f"800x600+{(sw-800)//2}+{(sh-600)//2}")
+        
+        ctk.CTkLabel(win, text="🔍 COMANDO SQL PRONTO PARA EXECUÇÃO", font=("Arial", 18, "bold"), text_color="#1565C0").pack(pady=(20, 10))
+        
+        # Container Branco Arredondado
+        container = ctk.CTkFrame(win, fg_color="white", corner_radius=12)
+        container.pack(fill="both", expand=True, padx=40, pady=(0, 20))
+        
+        text_area = ctk.CTkTextbox(container, font=("Consolas", 12), fg_color="white", text_color="#1E293B", border_width=0)
+        text_area.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Inserir Conteúdo (Resumo + Query)
+        conteudo_completo = f"{resumo}\n\n{'='*50}\n\n{query}"
+        text_area.insert("0.0", conteudo_completo)
+        text_area.configure(state="disabled")
+        
+        # Botões de Rodapé VIP
+        footer = ctk.CTkFrame(win, fg_color="transparent")
+        footer.pack(fill="x", side="bottom", pady=20)
+        
+        def copiar():
+            self.clipboard_clear()
+            self.clipboard_append(query)
+            self.update()
+            from tkinter import messagebox
+            messagebox.showinfo("Copiado", "COMANDO SQL TÉCNICO COPIADO!")
+
+        ctk.CTkButton(footer, text="📋 COPIAR SQL", font=("Arial", 12, "bold"), fg_color="#2E7D32", hover_color="#1B5E20", 
+                     corner_radius=8, height=35, command=copiar).pack(side="left", padx=(40, 10))
+        
+        ctk.CTkButton(footer, text="FECHAR", font=("Arial", 12, "bold"), fg_color="#475569", hover_color="#334155", 
+                     corner_radius=8, height=35, command=win.destroy).pack(side="left", padx=10)
+
+
+class CaixaFrentistaItensWindow(BaseWindow):
+    """Tela de Detalhamento de Movimentos (POCF1) vinculada ao fechamento do Resumo (POCF2)."""
+    def __init__(self, parent, config, usu, tst_fe, parent_filters=None):
+        self.usu_filter = usu
+        self.tst_filter = tst_fe
+        self.parent_filters = parent_filters
+        title = f"📋 Itens do Caixa - Frentista: {usu}"
+        super().__init__(parent, title, "CX_FRENTISTA_ITENS")
+        self.config_db = config
+        self.hub = parent.hub if hasattr(parent, 'hub') else parent
+        self.is_posto_table = True
+
+        # Botão Voltar Customizado (Prioridade Alta)
+        self.btn_voltar = ctk.CTkButton(self.top_frame, text="⬅  VOLTAR AO RESUMO", width=180, height=32, 
+                                       fg_color="#475569", hover_color="#334155", font=("Arial", 12, "bold"),
+                                       command=self.voltar)
+        self.btn_voltar.pack(side="right", padx=20, pady=5)
+
+        # --- FILTRO POR TIPO DE MOVIMENTO ---
+        self.tipmo_legend = {
+            "Todos": "Todos",
+            "V": "V - VENDA A VISTA",
+            "P": "P - VENDA PRAZO",
+            "C": "C - VENDA CARTÃO",
+            "S": "S - VALE CLIENTE",
+            "E": "E - VALE POSTO",
+            "R": "R - RECEBIMENTOS",
+            "$": "$ - VENDA PRAZO (M)",
+            "A": "A - BAIXA DE VALE",
+            "O": "O - OUTROS",
+            "B": "B - BOMBA AGUARD.",
+            "M": "M - ENTRADA/SAIDA",
+            "1": "1 - SAIU $ ENTROU CARTÃO",
+            "2": "2 - SAIU CARTÃO ENTROU $",
+            "D": "D - DESPESAS",
+            "3": "3 - CARTÃO DÉBITO",
+            "4": "4 - CARTÃO CRÉDITO",
+            "5": "5 - PIX",
+            "6": "6 - VENDA CARTÃO DÉBITO",
+            "7": "7 - CARTÃO ALELO",
+            "8": "8 - TRANSF. $ LOJA"
+        }
+        
+        self.filter_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=20, pady=5)
+        
+        ctk.CTkLabel(self.filter_frame, text="🔍 Filtrar Tipo:", font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.combo_tipmo = ctk.CTkComboBox(self.filter_frame, values=list(self.tipmo_legend.values()), 
+                                         width=220, height=32, command=lambda _: self.carregar_dados())
+        self.combo_tipmo.pack(side="left", padx=5)
+        self.combo_tipmo.set("Todos")
+
+        # Checkbox: Somente com Desconto
+        self.chk_desc_var = ctk.BooleanVar(value=False)
+        self.chk_desc = ctk.CTkCheckBox(self.filter_frame, text="Só c/ Desconto", variable=self.chk_desc_var,
+                                        font=("Arial", 12, "bold"), command=self.carregar_dados,
+                                        checkbox_width=20, checkbox_height=20)
+        self.chk_desc.pack(side="left", padx=(15, 5))
+
+        # Configuração da Grid (Colunas Essenciais da POCF1)
+        cols = ("Tst", "Regis", "VlrCx", "VlrDs", "TipMo", "DesTi", "Obs", "ProDe", "Qtd", "VlrUn", "DCx")
+        heads = ("🕒 Lançamento", "Regis.", "💰 Vlr Cx", "📉 Desconto", "Tipo", "Descrição", "Obs.", "📦 Produto", "📊 Qtd", "💰 Unit.", "📅 Data Cx")
+        wids = (140, 80, 100, 100, 60, 120, 150, 200, 80, 90, 100)
+        alns = ("center", "center", "e", "e", "center", "w", "w", "w", "e", "e", "center")
+        
+        self.configurar_grid(cols, heads, wids, alns)
+        
+        # Scrollbar Horizontal se necessário
+        self.h_scroll = ttk.Scrollbar(self.grid_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(xscrollcommand=self.h_scroll.set)
+        self.h_scroll.pack(side="bottom", fill="x")
+
+        # --- RODAPÉ DE TOTAIS (tree_totais espelhada - Padrão Ouro) ---
+        totais_frame = ctk.CTkFrame(self, height=35, fg_color="transparent", corner_radius=0)
+        totais_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0,0))
+        
+        self.tree_totais = ttk.Treeview(totais_frame, columns=cols, show="", height=1, style="TotaisItens.Treeview")
+        self.tree_totais.column("#0", width=0, stretch=False)
+        for c, w, a in zip(cols, wids, alns):
+            self.tree_totais.column(c, width=w, minwidth=w, anchor=a)
+        
+        style_t = ttk.Style()
+        style_t.configure("TotaisItens.Treeview", background="#1565C0", foreground="white", font=("Arial", 12, "bold"), rowheight=28)
+        self.tree_totais.pack(fill="x", expand=True)
+
+
+
+        self.after(200, self.carregar_dados)
+
+    def fechar_tela(self):
+        """Sobrescreve o fechar da BaseWindow para retornar ao resumo, não ao Posto."""
+        self.voltar()
+
+    def voltar(self):
+        """Retorna para a tela de resumo preservando os filtros originais."""
+        self.pack_forget()
+        resumo = CaixaFrentistaResumoWindow(self.hub.main_frame, self.config_db, self.parent_filters)
+        resumo.hub = self.hub
+        resumo.pack(fill="both", expand=True)
+        self.hub.modulo_atual = resumo
+        self.destroy()
+
+    def get_sql_summary(self):
+        return (
+            "--- DETALHAMENTO DE ITENS (POCF1) ---\n"
+            "FILTRO APLICADO:\n"
+            f"- Frentista: {self.usu_filter}\n"
+            f"- Fechamento (Timestamp): {self.tst_filter}\n"
+            f"- Filtro Tipo Mov: {self.combo_tipmo.get()}\n"
+            "- Posto: (ID Selecionado no Hub)\n\n"
+            "VÍNCULO TÉCNICO:\n"
+            "POCF1.POCF1TstFe = POCF2.POCF2Tst (Referência ao momento da abertura do turno)"
+        )
+
+    def get_current_query(self):
+        posto_id = self.hub.get_selected_posto_id() if hasattr(self, 'hub') else 1
+        tst_seg = self.tst_filter[:19]
+        
+        # Obter o código do tipo selecionado no combo
+        tip_sel_label = self.combo_tipmo.get()
+        tip_code = "Todos"
+        for code, label in self.tipmo_legend.items():
+            if label == tip_sel_label:
+                tip_code = code
+                break
+        
+        where_tip = f" AND POCF1TipMo = '{tip_code}' " if tip_code != "Todos" else ""
+        where_desc = " AND POCF1VlrDs <> 0 " if self.chk_desc_var.get() else ""
+
+        return f"""SELECT 
+    POCF1Tst, POCF1Regis, POCF1VlrCx, POCF1VlrDs, POCF1TipMo, 
+    CASE RTRIM(POCF1TipMo) 
+        WHEN 'V' THEN 'VENDA A VISTA' WHEN 'P' THEN 'VENDA PRAZO' WHEN 'C' THEN 'VENDA CARTÃO'
+        WHEN 'S' THEN 'VALE CLIENTE' WHEN 'E' THEN 'VALE POSTO' WHEN 'R' THEN 'RECEBIMENTOS'
+        WHEN '$' THEN 'VENDA PRAZO (M)' WHEN 'A' THEN 'BAIXA DE VALE' WHEN 'O' THEN 'OUTROS'
+        WHEN 'B' THEN 'BOMBA AGUARD.' WHEN 'M' THEN 'ENTRADA/SAIDA' WHEN 'D' THEN 'DESPESAS'
+        WHEN '1' THEN 'SAIU $ ENTROU CARTÃO' WHEN '2' THEN 'SAIU CARTÃO ENTROU $'
+        WHEN '3' THEN 'CARTÃO DÉBITO' WHEN '4' THEN 'C.CRÉDITO LJ.CONV.' WHEN '5' THEN 'PIX'
+        WHEN '6' THEN 'VENDA CARTÃO DÉBITO' WHEN '7' THEN 'CARTÃO ALELO' WHEN '8' THEN 'TRANSF. $ LOJA'
+        ELSE ISNULL(RTRIM(POCF1TipMo), 'ERRO') END as DesTi,
+    POCF1Obs, POCF1ProDe, POCF1Qtd, POCF1VlrUn, POCF1DCx
+FROM POCF1
+WHERE POEmpCod = {posto_id}
+  AND (CONVERT(VARCHAR, POCF1TstFe, 120) LIKE '{tst_seg}%' OR CONVERT(VARCHAR, POCF1TstFe, 121) LIKE '{tst_seg}%')
+  AND RTRIM(POCF1Usu) = '{self.usu_filter.strip()}'
+  {where_tip}
+  {where_desc}
+ORDER BY POCF1Tst ASC"""
+
+    def carregar_dados(self):
+        try:
+            import pyodbc
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.config_db['servidor']};DATABASE={self.config_db['banco']};UID={self.config_db['usuario_bd']};PWD={self.config_db['senha_bd']}"
+            conn = pyodbc.connect(conn_str); cur = conn.cursor()
+            sql = self.get_current_query()
+            print(f"\n[DEBUG] SQL POCF1: {sql}")
+            self.ultima_query_bruta = sql
+            cur.execute(sql)
+            rows = cur.fetchall()
+            from tkinter import messagebox
+            if len(rows) == 0:
+                tst_msg = self.tst_filter[:19] # Local p/ evitar erro de escopo
+                messagebox.showwarning("Diagnóstico POCF1", f"Atenção: Nenhum registro encontrado para este frentista/horário.\n\nFiltro: {tst_msg}\nFrentista: {self.usu_filter}")
+            print(f"[DEBUG] POCF1 retornou {len(rows)} registros.")
+
+            for item in self.tree.get_children(): self.tree.delete(item)
+            fmt_moeda = lambda v: f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            total_vlr_cx = 0.0
+            total_vlr_ds = 0.0
+
+            for r in rows:
+                v = list(r)
+                # Mapeamento Novo: 0:Tst, 1:Regis, 2:VlrCx, 3:VlrDs, 4:TipMo, 5:DesTi, 6:Obs, 7:ProDe, 8:Qtd, 9:VlrUn, 10:DCx
+                
+                # Somar totais
+                total_vlr_cx += float(v[2] or 0)
+                total_vlr_ds += float(v[3] or 0)
+
+                # Formatar Datas: 0(Tst), 10(DCx)
+                if v[0] and hasattr(v[0], "strftime"): v[0] = v[0].strftime("%d/%m/%Y %H:%M")
+                if v[10] and hasattr(v[10], "strftime"): v[10] = v[10].strftime("%d/%m/%Y")
+                # Formatar Moedas: 2(VlrCx), 3(VlrDs), 9(VlrUn)
+                for idx in [2, 3, 9]:
+                    v[idx] = fmt_moeda(float(v[idx] or 0))
+                # Quantidade: 8
+                v[8] = f"{float(v[8] or 0):,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                
+                self.tree.insert("", "end", values=tuple(v))
+
+            # Atualizar tree_totais (Padrão Ouro - barra azul alinhada)
+            for item in self.tree_totais.get_children(): self.tree_totais.delete(item)
+            self.tree_totais.insert("", "end", values=(
+                f"REGISTROS: {len(rows)}", "", fmt_moeda(total_vlr_cx), fmt_moeda(total_vlr_ds),
+                "", "", "", "", "", "", ""))
+
+            self.re_zebrar(); conn.close()
+        except Exception as e:
+            print(f"Erro ao carregar detalhes POCF1: {e}")
 
 
 class AnaliseProdutoWindow(BaseWindow):
